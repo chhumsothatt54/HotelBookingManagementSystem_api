@@ -322,7 +322,55 @@ Route::middleware([
             'message' => 'Welcome Customer'
         ]);
     });
+/*
+|--------------------------------------------------------------------------
+| Customer Public Routes (មិនបាច់ Login ក៏មើលបាន)
+|--------------------------------------------------------------------------
+*/
+Route::prefix('customer')->group(function () {
+    Route::get('/hotels', [CustomerController::class, 'hotels']);
+    Route::get('/hotels/{id}', [CustomerController::class, 'hotelDetail']);
+    Route::get('/hotels/{hotelId}/room-types', [CustomerController::class, 'roomTypes']);
+    Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'availableRooms']);
+});
 
+
+/*
+|--------------------------------------------------------------------------
+| Customer Protected Routes (ទាមទារ Login)
+|--------------------------------------------------------------------------
+*/
+Route::middleware([
+    'auth:sanctum',
+    'customer' // ប្រើ middleware 'customer' តាមកូដដើមរបស់អ្នក
+])->prefix('customer')->group(function () {
+
+    Route::get('/dashboard', function () {
+        return response()->json([
+            'message' => 'Welcome Customer'
+        ]);
+    });
+
+    // Bookings
+    Route::post('/bookings', [CustomerController::class, 'createBooking']);
+    Route::get('/bookings', [CustomerController::class, 'myBookings']);
+    Route::get('/bookings/{id}', [CustomerController::class, 'bookingDetail']);
+    Route::put('/bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
+
+    // Payments
+    Route::post('/bookings/{bookingId}/payment', [CustomerController::class, 'createPayment']);
+    Route::get('/bookings/{bookingId}/payment', [CustomerController::class, 'payment']);
+
+    // Reviews
+    Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
+    Route::get('/reviews', [CustomerController::class, 'myReviews']);
+    Route::put('/reviews/{id}', [CustomerController::class, 'updateReview']);
+    Route::delete('/reviews/{id}', [CustomerController::class, 'deleteReview']);
+
+    // Notifications
+    Route::get('/notifications', [CustomerController::class, 'notifications']);
+    Route::put('/notifications/{id}/read', [CustomerController::class, 'markNotificationRead']);
+});
 
 
 });
