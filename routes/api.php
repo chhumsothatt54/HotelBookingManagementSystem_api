@@ -74,105 +74,106 @@ Route::middleware([
         'dashboard'
     ]);
 
-    // Route::get('/users', [
-    //     AdminController::class,
-    //     'users'
-    // ]);
+    Route::get('/users', [
+        AdminController::class,
+        'users'
+    ]);
 
-    // Route::get('/users/{id}', [
-    //     AdminController::class,
-    //     'showUser'
-    // ]);
+    Route::get('/users/{id}',[
+        AdminController::class,
+        'showUser'
+    ]);
 
-    // Route::patch('/users/{id}/status', [
-    //     AdminController::class,
-    //     'updateUserStatus'
-    // ]);
+    Route::patch('/users/{id}/status', [
+        AdminController::class,
+        'updateUserStatus'
+    ]);
 
-    // Route::get('/managers', [
-    //     AdminController::class,
-    //     'managers'
-    // ]);
+    Route::get('/manager',[
+        AdminController::class,
+        'managers'
+    ]);
 
-    // Route::patch('/managers/{id}/status', [
-    //     AdminController::class,
-    //     'updateManagerStatus'
-    // ]);
+    Route::patch('/managers/{id}/status', [
+        AdminController::class,
+        'updateManagerStatus'
+    ]);
 
-    // Route::get('/hotels', [
-    //     AdminController::class,
-    //     'hotels'
-    // ]);
+    Route::get('/hotels', [
+        AdminController::class,
+        'hotels'
+    ]);
 
-    // Route::get('/hotels/{id}', [
-    //     AdminController::class,
-    //     'showHotel'
-    // ]);
+    Route::get('/hotels/{id}', [
+        AdminController::class,
+        'showHotel'
+    ]);
 
-    // Route::patch('/hotels/{id}/status', [
-    //     AdminController::class,
-    //     'updateHotelStatus'
-    // ]);
+    Route::patch('/hotels/{id}/status', [
+        AdminController::class,
+        'updateHotelStatus'
+    ]);
 
-    // Route::get('/room-types', [
-    //     AdminController::class,
-    //     'roomTypes'
-    // ]);
+    Route::get('/room-types', [
+        AdminController::class,
+        'roomTypes'
+    ]);
 
-    // Route::get('/rooms', [
-    //     AdminController::class,
-    //     'rooms'
-    // ]);
+    Route::get('/rooms', [
+        AdminController::class,
+        'rooms'
+    ]);
 
-    // Route::get('/amenities', [
-    //     AdminController::class,
-    //     'amenities'
-    // ]);
+    Route::get('/amenities', [
+        AdminController::class,
+        'amenities'
+    ]);
+    // noted
 
-    // Route::get('/bookings', [
-    //     AdminController::class,
-    //     'bookings'
-    // ]);
+    Route::get('/bookings', [
+        AdminController::class,
+        'bookings'
+    ]);
 
-    // Route::get('/bookings/{id}', [
-    //     AdminController::class,
-    //     'showBooking'
-    // ]);
+    Route::get('/bookings/{id}', [
+        AdminController::class,
+        'showBooking'
+    ]);
 
-    // Route::get('/payments', [
-    //     AdminController::class,
-    //     'payments'
-    // ]);
+    Route::get('/payments', [
+        AdminController::class,
+        'payments'
+    ]);
 
-    // Route::get('/reviews', [
-    //     AdminController::class,
-    //     'reviews'
-    // ]);
+    Route::get('/reviews', [
+        AdminController::class,
+        'reviews'
+    ]);
 
-    // Route::patch('/reviews/{id}/status', [
-    //     AdminController::class,
-    //     'updateReviewStatus'
-    // ]);
+    Route::patch('/reviews/{id}/status', [
+        AdminController::class,
+        'updateReviewStatus'
+    ]);
 
-    // Route::get('/reports/revenue', [
-    //     AdminController::class,
-    //     'revenueReport'
-    // ]);
+    Route::get('/reports/revenue', [
+        AdminController::class,
+        'revenueReport'
+    ]);
 
-    // Route::get('/reports/occupancy', [
-    //     AdminController::class,
-    //     'occupancyReport'
-    // ]);
+    Route::get('/reports/occupancy', [
+        AdminController::class,
+        'occupancyReport'
+    ]);
 
-    // Route::get('/notifications', [
-    //     AdminController::class,
-    //     'notifications'
-    // ]);
+    Route::get('/notifications', [
+        AdminController::class,
+        'notifications'
+    ]);
 
-    // Route::get('/audit-logs', [
-    //     AdminController::class,
-    //     'auditLogs'
-    // ]);
+    Route::get('/audit-logs', [
+        AdminController::class,
+        'auditLogs'
+    ]);
 
 });
 
@@ -212,6 +213,6 @@ Route::middleware([
         ]);
     });
 
-    
+
 
 });
