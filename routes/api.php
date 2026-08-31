@@ -6,6 +6,8 @@ use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\HotelControler;
+use App\Http\Controllers\HotelManagerController;
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -188,11 +190,119 @@ Route::middleware([
     'manager'
 ])->prefix('manager')->group(function () {
 
-    Route::get('/dashboard', function () {
-        return response()->json([
-            'message' => 'Welcome Hotel Manager'
-        ]);
-    });
+    // Dashboard
+    Route::get('/dashboard', [
+        HotelManagerController::class,
+        'dashboard'
+    ]);
+
+    // Hotel
+    Route::get('/hotel', [
+        HotelManagerController::class,
+        'myHotel'
+    ]);
+
+    // //  បន្ថែម Route មួយនេះសម្រាប់បង្កើត Hotel ថ្មី
+    // Route::post('/hotel', [
+    //     HotelManagerController::class,
+    //     'storeHotel'
+    // ]);
+
+    Route::put('/hotel', [
+        HotelManagerController::class,
+        'updateHotel'
+    ]);
+
+    // Room Types
+    Route::get('/room-types', [
+        HotelManagerController::class,
+        'roomTypes'
+    ]);
+
+    Route::post('/room-types', [
+        HotelManagerController::class,
+        'storeRoomType'
+    ]);
+
+    Route::put('/room-types/{id}', [
+        HotelManagerController::class,
+        'updateRoomType'
+    ]);
+
+    Route::delete('/room-types/{id}', [
+        HotelManagerController::class,
+        'deleteRoomType'
+    ]);
+
+    // Rooms
+    Route::get('/rooms', [
+        HotelManagerController::class,
+        'rooms'
+    ]);
+
+    Route::post('/rooms', [
+        HotelManagerController::class,
+        'storeRoom'
+    ]);
+
+    Route::put('/rooms/{id}', [
+        HotelManagerController::class,
+        'updateRoom'
+    ]);
+
+    Route::delete('/rooms/{id}', [
+        HotelManagerController::class,
+        'deleteRoom'
+    ]);
+
+    // Amenities
+    Route::get('/amenities', [
+        HotelManagerController::class,
+        'amenities'
+    ]);
+
+    Route::post('/amenities/{amenityId}', [
+        HotelManagerController::class,
+        'attachAmenity'
+    ]);
+
+    Route::delete('/amenities/{amenityId}', [
+        HotelManagerController::class,
+        'detachAmenity'
+    ]);
+
+    // Bookings
+    Route::get('/bookings', [
+        HotelManagerController::class,
+        'bookings'
+    ]);
+
+    Route::get('/bookings/{id}', [
+        HotelManagerController::class,
+        'showBooking'
+    ]);
+
+    Route::put('/bookings/{id}/status', [
+        HotelManagerController::class,
+        'updateBookingStatus'
+    ]);
+
+    // Reviews
+    Route::get('/reviews', [
+        HotelManagerController::class,
+        'reviews'
+    ]);
+
+    // Reports
+    Route::get('/reports/revenue', [
+        HotelManagerController::class,
+        'revenueReport'
+    ]);
+
+    Route::get('/reports/occupancy', [
+        HotelManagerController::class,
+        'occupancyReport'
+    ]);
 
 });
 
