@@ -2,8 +2,8 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\VerifyEmailMail;
 use App\Mail\ForgotPasswordOtpMail;
+use App\Mail\VerifyEmailMail;
 use App\Models\EmailVerification;
 use App\Models\PasswordResetOtp;
 use App\Models\User;
@@ -60,15 +60,15 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'message' => 'User not found'
+                'message' => 'User not found',
             ], 404);
         }
 
         if ($user->email_verified_at) {
             return response()->json([
-                'message' => 'Email already verified'
+                'message' => 'Email already verified',
             ], 400);
         }
 
@@ -108,15 +108,15 @@ class AuthController extends Controller
             ->whereNull('verified_at')
             ->first();
 
-        if (!$verification) {
+        if (! $verification) {
             return response()->json([
-                'message' => 'Invalid verification token'
+                'message' => 'Invalid verification token',
             ], 400);
         }
 
         if (Carbon::parse($verification->expires_at)->isPast()) {
             return response()->json([
-                'message' => 'Verification token expired'
+                'message' => 'Verification token expired',
             ], 400);
         }
 
@@ -145,21 +145,21 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user || !Hash::check($request->password, $user->password)) {
+        if (! $user || ! Hash::check($request->password, $user->password)) {
             return response()->json([
-                'message' => 'Invalid email or password'
+                'message' => 'Invalid email or password',
             ], 401);
         }
 
-        if (!$user->email_verified_at) {
+        if (! $user->email_verified_at) {
             return response()->json([
-                'message' => 'Please verify your email first'
+                'message' => 'Please verify your email first',
             ], 403);
         }
 
         if ($user->status !== 'active') {
             return response()->json([
-                'message' => 'Your account is not active'
+                'message' => 'Your account is not active',
             ], 403);
         }
 
@@ -180,7 +180,7 @@ class AuthController extends Controller
             ->delete();
 
         return response()->json([
-            'message' => 'Logout successful'
+            'message' => 'Logout successful',
         ]);
     }
 
@@ -192,9 +192,9 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'message' => 'User not found'
+                'message' => 'User not found',
             ], 404);
         }
 
@@ -234,9 +234,9 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'message' => 'User not found'
+                'message' => 'User not found',
             ], 404);
         }
 
@@ -246,15 +246,15 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (!$passwordResetOtp) {
+        if (! $passwordResetOtp) {
             return response()->json([
-                'message' => 'Invalid OTP'
+                'message' => 'Invalid OTP',
             ], 400);
         }
 
         if (Carbon::parse($passwordResetOtp->expires_at)->isPast()) {
             return response()->json([
-                'message' => 'OTP expired'
+                'message' => 'OTP expired',
             ], 400);
         }
 
@@ -263,7 +263,7 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'OTP verified successfully'
+            'message' => 'OTP verified successfully',
         ]);
     }
 
@@ -276,9 +276,9 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (!$user) {
+        if (! $user) {
             return response()->json([
-                'message' => 'User not found'
+                'message' => 'User not found',
             ], 404);
         }
 
@@ -287,15 +287,15 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (!$otp) {
+        if (! $otp) {
             return response()->json([
-                'message' => 'Please verify OTP first'
+                'message' => 'Please verify OTP first',
             ], 403);
         }
 
         if (Carbon::parse($otp->expires_at)->isPast()) {
             return response()->json([
-                'message' => 'OTP verification expired'
+                'message' => 'OTP verification expired',
             ], 400);
         }
 
@@ -307,7 +307,7 @@ class AuthController extends Controller
         $otp->delete();
 
         return response()->json([
-            'message' => 'Password changed successfully'
+            'message' => 'Password changed successfully',
         ]);
     }
 
@@ -320,12 +320,12 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (!Hash::check(
+        if (! Hash::check(
             $request->current_password,
             $user->password
         )) {
             return response()->json([
-                'message' => 'Current password is incorrect'
+                'message' => 'Current password is incorrect',
             ], 400);
         }
 
@@ -334,7 +334,72 @@ class AuthController extends Controller
         ]);
 
         return response()->json([
-            'message' => 'Password changed successfully'
+            'message' => 'Password changed successfully',
         ]);
+    }
+
+    public function updateProfile(Request $request)
+    {
+        // Get currently authenticated user
+        $user = $request->user();
+
+        // Validate input
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+            ],
+
+            'phone' => [
+                'nullable',
+                'string',
+                'min:8',
+                'max:20',
+            ],
+
+            'avatar' => [
+                'nullable',
+                'image',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+        ]);
+
+        // Upload avatar
+        if ($request->hasFile('avatar')) {
+
+            // Delete old avatar
+            if (
+                $user->avatar &&
+                file_exists(public_path($user->avatar))
+            ) {
+                unlink(public_path($user->avatar));
+            }
+
+            $file = $request->file('avatar');
+
+            $fileName = time().'_'.uniqid().'.'.
+                $file->getClientOriginalExtension();
+
+            $file->move(
+                public_path('uploads/avatars'),
+                $fileName
+            );
+
+            $validated['avatar'] = 'uploads/avatars/'.$fileName;
+        } else {
+            // Remove avatar from validated array
+            unset($validated['avatar']);
+        }
+
+        // Update profile
+        $user->update($validated);
+
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'data' => $user->fresh(),
+        ], 200);
     }
 }
