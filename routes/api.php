@@ -312,65 +312,51 @@ Route::middleware([
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([
-    'auth:sanctum',
-    'customer'
-])->prefix('customer')->group(function () {
 
-    Route::get('/dashboard', function () {
-        return response()->json([
-            'message' => 'Welcome Customer'
-        ]);
-    });
-/*
-|--------------------------------------------------------------------------
-| Customer Public Routes (មិនបាច់ Login ក៏មើលបាន)
-|--------------------------------------------------------------------------
-*/
-Route::prefix('customer')->group(function () {
+Route::prefix('v1')->group(function () {
+
+    // ------------------ Public Routes ------------------
+    // Search, Filter & Sort Hotels
     Route::get('/hotels', [CustomerController::class, 'hotels']);
     Route::get('/hotels/{id}', [CustomerController::class, 'hotelDetail']);
-    Route::get('/hotels/{hotelId}/room-types', [CustomerController::class, 'roomTypes']);
-    Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'availableRooms']);
-});
+    Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'hotelRooms']);
+    Route::get('/rooms/availability', [CustomerController::class, 'checkAvailability']);
+    
+    Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); // search-by-amenity
+    Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); // search-by-room
+    Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); // search-by-location
+    // ------------------ Protected Routes (Auth Required) ------------------
+    Route::middleware(['auth:sanctum', 'customer'])->group(function () {
 
+        // Profile Management (56)
+        Route::get('/profile', [CustomerController::class, 'getProfile']);
+        Route::put('/profile', [CustomerController::class, 'updateProfile']);
 
-/*
-|--------------------------------------------------------------------------
-| Customer Protected Routes (ទាមទារ Login)
-|--------------------------------------------------------------------------
-*/
-Route::middleware([
-    'auth:sanctum',
-    'customer' // ប្រើ middleware 'customer' តាមកូដដើមរបស់អ្នក
-])->prefix('customer')->group(function () {
+        // Booking Process 
+        Route::post('/bookings', [CustomerController::class, 'createBooking']);
+        Route::post('/payments', [CustomerController::class, 'createPayment']);
 
-    Route::get('/dashboard', function () {
-        return response()->json([
-            'message' => 'Welcome Customer'
-        ]);
+        // Customer Bookings 
+        Route::prefix('customer')->group(function () {
+            Route::get('/bookings', [CustomerController::class, 'bookingHistory']);
+            Route::get('/bookings/{id}', [CustomerController::class, 'bookingDetail']);
+            Route::get('/bookings/{id}/confirmation', [CustomerController::class, 'bookingConfirmation']);
+            Route::patch('/bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
+            Route::post('/bookings/{id}/refund', [CustomerController::class, 'requestRefund']);
+            
+            // Hotel Review 
+            Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
+        });
+
+        // Notifications 
+        Route::prefix('notifications')->group(function () {
+            Route::get('/', [CustomerController::class, 'getNotifications']);
+            Route::patch('/read-all', [CustomerController::class, 'readAllNotifications']);     
+            Route::patch('/{id}/read', [CustomerController::class, 'readNotification']);
+        });
+
     });
-
-    // Bookings
-    Route::post('/bookings', [CustomerController::class, 'createBooking']);
-    Route::get('/bookings', [CustomerController::class, 'myBookings']);
-    Route::get('/bookings/{id}', [CustomerController::class, 'bookingDetail']);
-    Route::put('/bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
-
-    // Payments
-    Route::post('/bookings/{bookingId}/payment', [CustomerController::class, 'createPayment']);
-    Route::get('/bookings/{bookingId}/payment', [CustomerController::class, 'payment']);
-
-    // Reviews
-    Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
-    Route::get('/reviews', [CustomerController::class, 'myReviews']);
-    Route::put('/reviews/{id}', [CustomerController::class, 'updateReview']);
-    Route::delete('/reviews/{id}', [CustomerController::class, 'deleteReview']);
-
-    // Notifications
-    Route::get('/notifications', [CustomerController::class, 'notifications']);
-    Route::put('/notifications/{id}/read', [CustomerController::class, 'markNotificationRead']);
 });
 
 
-});
+
