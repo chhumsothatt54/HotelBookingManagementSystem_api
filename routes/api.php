@@ -7,6 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\HotelControler;
 use App\Http\Controllers\HotelManagerController;
+use App\Http\Controllers\Review;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -47,6 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
+    Route::put('/update/profile',[AuthController::class,'updateProfile']);
     // Logout
     Route::post('/logout', [
         AuthController::class,

@@ -9,6 +9,9 @@ use App\Models\Payment;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\User;
+use App\Models\Review;
+use DB;
+use App\Models\UserNotification;
 use Illuminate\Http\Request;
 
 class AdminController extends Controller
@@ -281,7 +284,7 @@ class AdminController extends Controller
 
     public function amenities()
     {
-        $amenity = Amenity::with('room_amenities', 'rooms')
+        $amenity = Amenity::with('rooms')
             ->latest()->paginate(10);
 
         return response()->json([
@@ -392,7 +395,7 @@ class AdminController extends Controller
 
         $review = Review::find($id);
 
-        if (! $review) {
+        if (!$review) {
             return response()->json([
                 'message' => 'Review not found',
             ], 404);
@@ -414,32 +417,31 @@ class AdminController extends Controller
     |--------------------------------------------------------------------------
     */
 
-    public function revenueReport()
-    {
-        $totalRevenue = Payment::where(
-            'status',
-            'paid'
-        )->sum('amount');
+public function revenueReport()
+{
+    $totalRevenue = Payment::where('status', 'paid')
+        ->sum('amount');
 
-        $monthlyRevenue = Payment::select(
-            DB::raw('MONTH(paid_at) as month'),
-            DB::raw('YEAR(paid_at) as year'),
+    $monthlyRevenue = Payment::select(
+            DB::raw('EXTRACT(MONTH FROM paid_at) as month'),
+            DB::raw('EXTRACT(YEAR FROM paid_at) as year'),
             DB::raw('SUM(amount) as total')
         )
-            ->where('status', 'paid')
-            ->groupBy(
-                DB::raw('YEAR(paid_at)'),
-                DB::raw('MONTH(paid_at)')
-            )
-            ->orderBy('year', 'desc')
-            ->orderBy('month', 'desc')
-            ->get();
+        ->where('status', 'paid')
+        ->groupBy(
+            DB::raw('EXTRACT(YEAR FROM paid_at)'),
+            DB::raw('EXTRACT(MONTH FROM paid_at)')
+        )
+        ->orderByDesc('year')
+        ->orderByDesc('month')
+        ->get();
 
-        return response()->json([
-            'total_revenue' => $totalRevenue,
-            'monthly_revenue' => $monthlyRevenue,
-        ]);
-    }
+    return response()->json([
+        'message' => 'Revenue report retrieved successfully',
+        'total_revenue' => $totalRevenue,
+        'monthly_revenue' => $monthlyRevenue
+    ]);
+}
 
     /*
     |--------------------------------------------------------------------------
