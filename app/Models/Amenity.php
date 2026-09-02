@@ -24,12 +24,4 @@ class Amenity extends Model
             'room_amenities'
         )->withTimestamps();
     }
-
-<<<<<<< HEAD
-    public function amenity()
-    {
-        return $this->belongsTo(Amenity::class);
-    }
-=======
->>>>>>> 47061af7a86db04415ec06906469d5e8b2df2019
 }

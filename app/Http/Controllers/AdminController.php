@@ -6,15 +6,10 @@ use App\Models\Amenity;
 use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\Payment;
-use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\User;
-<<<<<<< HEAD
-=======
 use App\Models\Review;
-use DB;
->>>>>>> 47061af7a86db04415ec06906469d5e8b2df2019
 use App\Models\UserNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
