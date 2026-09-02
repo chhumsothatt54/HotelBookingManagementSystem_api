@@ -7,6 +7,7 @@ use App\Models\RoomType;
 use App\Models\Room;
 use App\Models\Amenity;
 use App\Models\Booking;
+use App\Models\HotelImage;
 use App\Models\Review;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -72,47 +73,16 @@ class HotelManagerController extends Controller
 
     /*
     |--------------------------------------------------------------------------
-    | Hotel
+    | Hotel Management
     |--------------------------------------------------------------------------
     */
-    // public function storeHotel(Request $request)
-    // {
-    //     $manager = $request->user();
 
-    //     // ឆែកមើលថាបើមាន Hotel រួចហើយ មិនឱ្យបង្កើតជាន់គ្នាទេ
-    //     $existingHotel = Hotel::where('manager_id', $manager->id)->first();
-    //     if ($existingHotel) {
-    //         return response()->json([
-    //             'message' => 'You already have a hotel.'
-    //         ], 400);
-    //     }
-
-    //     $validated = $request->validate([
-    //         'name' => 'required|string|max:255',
-    //         'description' => 'nullable|string',
-    //         'phone' => 'nullable|string|max:30',
-    //         'email' => 'nullable|email|max:255',
-    //         'address' => 'required|string|max:500',
-    //         'city' => 'nullable|string|max:100',
-    //         'province' => 'nullable|string|max:100',
-    //     ]);
-
-    //     // ភ្ជាប់ manager_id ជាមួយ user ដែលកំពុង Login
-    //     $validated['manager_id'] = $manager->id;
-
-    //     $hotel = Hotel::create($validated);
-
-    //     return response()->json([
-    //         'message' => 'Hotel created successfully.',
-    //         'data' => $hotel
-    //     ], 201);
-    // }
-
+    // ១. មើលព័ត៌មាន Hotel របស់ខ្លួនឯង
     public function myHotel(Request $request)
     {
         $hotel = Hotel::where('manager_id', $request->user()->id)
-            ->with(['roomTypes', 'rooms', 'amenities'])
-            ->first();
+            ->with(['roomTypes', 'rooms.amenities'])
+            ->get();
 
         if (!$hotel) {
             return response()->json([
@@ -125,35 +95,73 @@ class HotelManagerController extends Controller
         ]);
     }
 
-
-    public function updateHotel(Request $request)
+    // ២. បង្កើត Hotel ថ្មី
+    public function storeHotel(Request $request)
     {
-        $hotel = Hotel::where('manager_id', $request->user()->id)
-            ->first();
+        $manager = $request->user();
 
-        if (!$hotel) {
-            return response()->json([
-                'message' => 'Hotel not found.'
-            ], 404);
-        }
+        // ឆែកមើលថាបើមាន Hotel រួចហើយ មិនឱ្យបង្កើតជាន់គ្នាទេ
+        // $existingHotel = Hotel::where('manager_id', $manager->id)->first();
+        // if ($existingHotel) {
+        //     return response()->json([
+        //         'message' => 'You already have a hotel.'
+        //     ], 400);
+        // }
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'description' => 'sometimes|string',
-            'phone' => 'sometimes|string|max:30',
-            'email' => 'sometimes|email|max:255',
-            'address' => 'sometimes|string|max:500',
-            'city' => 'sometimes|string|max:100',
-            'province' => 'sometimes|string|max:100',
-            'latitude' => 'sometimes|numeric',
-            'longitude' => 'sometimes|numeric',
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'phone'       => 'nullable|string|max:30',
+            'email'       => 'nullable|email|max:255',
+            'address'     => 'required|string|max:500',
+            'city'        => 'required|string|max:100',
+            'country'     => 'required|string|max:100',
+            'province'    => 'nullable|string|max:100',
         ]);
 
-        $hotel->update($validated);
+        // ភ្ជាប់ manager_id ជាមួយ user ដែលកំពុង Login
+        $validated['manager_id'] = $manager->id;
+
+        $hotel = Hotel::create($validated);
+
+        return response()->json([
+            'message' => 'Hotel created successfully.',
+            'data'    => $hotel
+        ], 201);
+    }
+
+    // ៣. កែប្រែព័ត៌មាន Hotel
+    public function updateHotel(Request $request, $id)
+{
+    // Find the hotel by its ID AND ensure it belongs to the logged-in manager
+    $hotel = Hotel::where('id', $id)
+        ->where('manager_id', $request->user()->id)
+        ->first();
+
+    if (!$hotel) {
+        return response()->json([
+            'message' => 'Hotel not found or unauthorized.'
+        ], 404);
+    }
+
+    $validated = $request->validate([
+        'name'        => 'sometimes|string|max:255',
+        'description' => 'sometimes|string',
+        'phone'       => 'sometimes|string|max:30',
+        'email'       => 'sometimes|email|max:255',
+        'address'     => 'sometimes|string|max:500',
+        'city'        => 'sometimes|string|max:100',
+        'country'     => 'sometimes|string|max:100',
+        'province'    => 'sometimes|string|max:100',
+        'latitude'    => 'sometimes|numeric',
+        'longitude'   => 'sometimes|numeric',
+    ]);
+
+    $hotel->update($validated);
 
         return response()->json([
             'message' => 'Hotel updated successfully.',
-            'data' => $hotel
+            'data'    => $hotel
         ]);
     }
 
@@ -180,33 +188,31 @@ class HotelManagerController extends Controller
     }
 
 
-    // public function storeRoomType(Request $request)
-    // {
-    //     $hotel = Hotel::where('manager_id', $request->user()->id)
-    //         ->firstOrFail();
+    public function storeRoomType(Request $request)
+    {
+        $hotel = Hotel::where('manager_id', $request->user()->id)
+            ->firstOrFail();
 
-    //     $validated = $request->validate([
-    //         'name' => 'required|string|max:255',
-    //         'description' => 'nullable|string',
-    //         'capacity' => 'required|integer|min:1',
-    //         'price' => 'required|numeric|min:0',
-    //     ]);
+        $validated = $request->validate([
+            'name'        => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'capacity'    => 'required|integer|min:1',
+            'price'       => 'required|numeric|min:0',
+        ]);
 
-    //     $validated['hotel_id'] = $hotel->id;
+        $validated['hotel_id'] = $hotel->id;
 
-    //     $roomType = RoomType::create($validated);
+        $roomType = RoomType::create($validated);
 
-    //     return response()->json([
-    //         'message' => 'Room type created successfully.',
-    //         'data' => $roomType
-    //     ], 201);
-    // }
+        return response()->json([
+            'message' => 'Room type created successfully.',
+            'data'    => $roomType
+        ], 201);
+    }
 
 
-    public function updateRoomType(
-        Request $request,
-        $id
-    ) {
+    public function updateRoomType(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -214,25 +220,23 @@ class HotelManagerController extends Controller
             ->findOrFail($id);
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
+            'name'        => 'sometimes|string|max:255',
             'description' => 'nullable|string',
-            'capacity' => 'sometimes|integer|min:1',
-            'price' => 'sometimes|numeric|min:0',
+            'capacity'    => 'sometimes|integer|min:1',
+            'price'       => 'sometimes|numeric|min:0',
         ]);
 
         $roomType->update($validated);
 
         return response()->json([
             'message' => 'Room type updated successfully.',
-            'data' => $roomType
+            'data'    => $roomType
         ]);
     }
 
 
-    public function deleteRoomType(
-        Request $request,
-        $id
-    ) {
+    public function deleteRoomType(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -276,9 +280,9 @@ class HotelManagerController extends Controller
 
         $validated = $request->validate([
             'room_type_id' => 'required|exists:room_types,id',
-            'room_number' => 'required|string|max:50',
-            'floor' => 'nullable|integer',
-            'status' => 'required|in:available,occupied,maintenance,inactive',
+            'room_number'  => 'required|string|max:50',
+            'floor'        => 'nullable|integer',
+            'status'       => 'required|in:available,occupied,maintenance,inactive',
         ]);
 
         $roomTypeExists = RoomType::where('id', $validated['room_type_id'])
@@ -297,15 +301,13 @@ class HotelManagerController extends Controller
 
         return response()->json([
             'message' => 'Room created successfully.',
-            'data' => $room
+            'data'    => $room
         ], 201);
     }
 
 
-    public function updateRoom(
-        Request $request,
-        $id
-    ) {
+    public function updateRoom(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -314,24 +316,22 @@ class HotelManagerController extends Controller
 
         $validated = $request->validate([
             'room_type_id' => 'sometimes|exists:room_types,id',
-            'room_number' => 'sometimes|string|max:50',
-            'floor' => 'nullable|integer',
-            'status' => 'sometimes|in:available,occupied,maintenance,inactive',
+            'room_number'  => 'sometimes|string|max:50',
+            'floor'        => 'nullable|integer',
+            'status'       => 'sometimes|in:available,occupied,maintenance,inactive',
         ]);
 
         $room->update($validated);
 
         return response()->json([
             'message' => 'Room updated successfully.',
-            'data' => $room
+            'data'    => $room
         ]);
     }
 
 
-    public function deleteRoom(
-        Request $request,
-        $id
-    ) {
+    public function deleteRoom(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -354,11 +354,15 @@ class HotelManagerController extends Controller
 
     public function amenities(Request $request)
     {
-        $hotel = Hotel::where('manager_id', $request->user()->id)
-            ->firstOrFail();
+        $hotel = Hotel::where('manager_id', $request->user()->id)->firstOrFail();
+
+        // ទាញ amenities ទាំងអស់ដែលស្ថិតនៅក្នុង rooms របស់ hotel នេះ
+        $amenities = Amenity::whereHas('rooms', function ($query) use ($hotel) {
+            $query->where('hotel_id', $hotel->id);
+        })->get();
 
         return response()->json([
-            'data' => $hotel->amenities
+            'data' => $amenities
         ]);
     }
 
@@ -366,11 +370,19 @@ class HotelManagerController extends Controller
     public function attachAmenity(
         Request $request,
         $amenityId
-    ) {
-        $hotel = Hotel::where('manager_id', $request->user()->id)
-            ->firstOrFail();
+            ) {
+                $hotel = Hotel::where('manager_id', $request->user()->id)
+                    ->firstOrFail();
 
-        $amenity = Amenity::findOrFail($amenityId);
+                // $amenity = Amenity::findOrFail($amenityId);
+                $amenity = Amenity::find($amenityId);
+
+        if (!$amenity) {
+            return response()->json([
+                'status' => 'error',
+                'message' => 'Amenity not found.'
+            ], 404);
+        }
 
         $hotel->amenities()->syncWithoutDetaching([
             $amenity->id
@@ -397,6 +409,7 @@ class HotelManagerController extends Controller
     }
 
 
+
     /*
     |--------------------------------------------------------------------------
     | Bookings
@@ -421,10 +434,8 @@ class HotelManagerController extends Controller
     }
 
 
-    public function showBooking(
-        Request $request,
-        $id
-    ) {
+    public function showBooking(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -443,10 +454,8 @@ class HotelManagerController extends Controller
     }
 
 
-    public function updateBookingStatus(
-        Request $request,
-        $id
-    ) {
+    public function updateBookingStatus(Request $request, $id) 
+    {
         $hotel = Hotel::where('manager_id', $request->user()->id)
             ->firstOrFail();
 
@@ -463,7 +472,7 @@ class HotelManagerController extends Controller
 
         return response()->json([
             'message' => 'Booking status updated successfully.',
-            'data' => $booking
+            'data'    => $booking
         ]);
     }
 
@@ -511,7 +520,7 @@ class HotelManagerController extends Controller
 
         return response()->json([
             'hotel' => $hotel->name,
-            'data' => $revenue
+            'data'  => $revenue
         ]);
     }
 
@@ -539,13 +548,56 @@ class HotelManagerController extends Controller
             : 0;
 
         return response()->json([
-            'hotel' => $hotel->name,
-            'total_rooms' => $totalRooms,
+            'hotel'          => $hotel->name,
+            'total_rooms'    => $totalRooms,
             'occupied_rooms' => $occupiedRooms,
             'available_rooms' => $totalRooms - $occupiedRooms,
             'occupancy_rate' => $occupancyRate . '%',
         ]);
     }
-    
+
+    //profile hotel manager
+    public function uploadImage(Request $request)
+{
+    $hotel = Hotel::where('manager_id', $request->user()->id)->first();
+
+    if (!$hotel) {
+        return response()->json([
+            'message' => 'Hotel not found.'
+        ], 404);
+    }
+
+    $request->validate([
+        'image'      => 'required|image|mimes:jpeg,png,jpg,webp|max:2048',
+        'is_primary' => 'nullable',
+    ]);
+
+    // រក្សាទុករូបភាពក្នុង storage/app/public/hotels
+    $path = $request->file('image')->store('hotels', 'public');
+
+    // បម្លែងតម្លៃ is_primary ទៅជា boolean ( handle multipart/form-data "true"/"1" )
+    $isPrimary = filter_var($request->is_primary, FILTER_VALIDATE_BOOLEAN);
+
+    // ប្រសិនបើកំណត់រូបនេះជា Primary ត្រូវប្តូររូបចាស់ៗទៅជា false
+    if ($isPrimary) {
+        HotelImage::where('hotel_id', $hotel->id)->update(['is_primary' => false]);
+    }
+
+    $hotelImage = HotelImage::create([
+        'hotel_id'   => $hotel->id,
+        'image'      => $path,
+        'is_primary' => $isPrimary,
+    ]);
+
+    return response()->json([
+        'message' => 'Image uploaded successfully.',
+        'data'    => [
+            'id'         => $hotelImage->id,
+            'hotel_id'   => $hotelImage->hotel_id,
+            'image_url'  => asset('storage/' . $hotelImage->image),
+            'is_primary' => $hotelImage->is_primary,
+        ]
+    ], 201);
 }
 
+}

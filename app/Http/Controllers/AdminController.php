@@ -6,10 +6,13 @@ use App\Models\Amenity;
 use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\Payment;
+use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\User;
+use App\Models\UserNotification;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AdminController extends Controller
 {

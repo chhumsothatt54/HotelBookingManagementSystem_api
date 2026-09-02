@@ -5,7 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\HotelControler;
+use App\Http\Controllers\HotelController;
 use App\Http\Controllers\HotelManagerController;
 
 Route::get('/user', function (Request $request) {
@@ -185,126 +185,51 @@ Route::middleware([
 |--------------------------------------------------------------------------
 */
 
-Route::middleware([
-    'auth:sanctum',
-    'manager'
-])->prefix('manager')->group(function () {
+Route::middleware(['auth:sanctum', 'manager'])
+    ->prefix('manager')
+    ->group(function () {
 
-    // Dashboard
-    Route::get('/dashboard', [
-        HotelManagerController::class,
-        'dashboard'
-    ]);
+        // Dashboard
+        Route::get('/dashboard', [HotelManagerController::class, 'dashboard']);
 
-    // Hotel
-    Route::get('/hotel', [
-        HotelManagerController::class,
-        'myHotel'
-    ]);
+        // Hotel Profile
+        Route::get('/hotel', [HotelManagerController::class, 'myHotel']);
+        Route::post('/hotel', [HotelManagerController::class, 'storeHotel']);
+        Route::put('/hotel/{id}', [HotelManagerController::class, 'updateHotel']);
+        //  Upload Hotel Image
+        Route::post('/hotel/images', [HotelManagerController::class, 'uploadImage']);
 
-    // //  បន្ថែម Route មួយនេះសម្រាប់បង្កើត Hotel ថ្មី
-    // Route::post('/hotel', [
-    //     HotelManagerController::class,
-    //     'storeHotel'
-    // ]);
+        // Room Types
+        Route::get('/room-types', [HotelManagerController::class, 'roomTypes']);
+        Route::post('/room-types', [HotelManagerController::class, 'storeRoomType']);
+        Route::put('/room-types/{id}', [HotelManagerController::class, 'updateRoomType']);
+        Route::delete('/room-types/{id}', [HotelManagerController::class, 'deleteRoomType']);
 
-    Route::put('/hotel', [
-        HotelManagerController::class,
-        'updateHotel'
-    ]);
+        // Rooms
+        Route::get('/rooms', [HotelManagerController::class, 'rooms']);
+        Route::post('/rooms', [HotelManagerController::class, 'storeRoom']);
+        Route::put('/rooms/{id}', [HotelManagerController::class, 'updateRoom']);
+        Route::delete('/rooms/{id}', [HotelManagerController::class, 'deleteRoom']);
 
-    // Room Types
-    Route::get('/room-types', [
-        HotelManagerController::class,
-        'roomTypes'
-    ]);
+        // Amenities
+        Route::get('/amenities', [HotelManagerController::class, 'amenities']);
+        Route::post('/amenities/{amenityId}', [HotelManagerController::class, 'attachAmenity']);
+        Route::delete('/amenities/{amenityId}', [HotelManagerController::class, 'detachAmenity']);
 
-    Route::post('/room-types', [
-        HotelManagerController::class,
-        'storeRoomType'
-    ]);
+        // Bookings
+        Route::get('/bookings', [HotelManagerController::class, 'bookings']);
+        Route::get('/bookings/{id}', [HotelManagerController::class, 'showBooking']);
+        Route::put('/bookings/{id}/status', [HotelManagerController::class, 'updateBookingStatus']);
 
-    Route::put('/room-types/{id}', [
-        HotelManagerController::class,
-        'updateRoomType'
-    ]);
+        // Reviews
+        Route::get('/reviews', [HotelManagerController::class, 'reviews']);
 
-    Route::delete('/room-types/{id}', [
-        HotelManagerController::class,
-        'deleteRoomType'
-    ]);
-
-    // Rooms
-    Route::get('/rooms', [
-        HotelManagerController::class,
-        'rooms'
-    ]);
-
-    Route::post('/rooms', [
-        HotelManagerController::class,
-        'storeRoom'
-    ]);
-
-    Route::put('/rooms/{id}', [
-        HotelManagerController::class,
-        'updateRoom'
-    ]);
-
-    Route::delete('/rooms/{id}', [
-        HotelManagerController::class,
-        'deleteRoom'
-    ]);
-
-    // Amenities
-    Route::get('/amenities', [
-        HotelManagerController::class,
-        'amenities'
-    ]);
-
-    Route::post('/amenities/{amenityId}', [
-        HotelManagerController::class,
-        'attachAmenity'
-    ]);
-
-    Route::delete('/amenities/{amenityId}', [
-        HotelManagerController::class,
-        'detachAmenity'
-    ]);
-
-    // Bookings
-    Route::get('/bookings', [
-        HotelManagerController::class,
-        'bookings'
-    ]);
-
-    Route::get('/bookings/{id}', [
-        HotelManagerController::class,
-        'showBooking'
-    ]);
-
-    Route::put('/bookings/{id}/status', [
-        HotelManagerController::class,
-        'updateBookingStatus'
-    ]);
-
-    // Reviews
-    Route::get('/reviews', [
-        HotelManagerController::class,
-        'reviews'
-    ]);
-
-    // Reports
-    Route::get('/reports/revenue', [
-        HotelManagerController::class,
-        'revenueReport'
-    ]);
-
-    Route::get('/reports/occupancy', [
-        HotelManagerController::class,
-        'occupancyReport'
-    ]);
-
-});
+        // Reports
+        Route::get('/reports/revenue', [HotelManagerController::class, 'revenueReport']);
+        Route::get('/reports/occupancy', [HotelManagerController::class, 'occupancyReport']);
+         
+        //all rout is 22  
+    });
 
 /*
 |--------------------------------------------------------------------------
