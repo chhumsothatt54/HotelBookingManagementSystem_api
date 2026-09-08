@@ -71,7 +71,7 @@ class AdminController extends Controller
 
     public function users()
     {
-        $users = User::where('role', 'customer')
+        $users = User::where('role', 'customer')->orWhere('role', 'hotel_manager')
             ->latest()
             ->paginate(15);
 

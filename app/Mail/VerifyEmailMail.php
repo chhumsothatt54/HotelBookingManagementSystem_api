@@ -14,26 +14,26 @@ class VerifyEmailMail extends Mailable
 {
     use Queueable, SerializesModels;
 
-    public function __construct(public string $token)
-    {
+    public function __construct(
+        public string $email,
+        public string $token
+    ) {}
 
-    }
-    public function build(){
-        return $this
-            ->subject('Verify Your Email')
-            ->view('emails.verify-email');
-    }
     public function envelope(): Envelope
     {
         return new Envelope(
-            subject: 'Verify Email Mail',
-
+            subject: 'Confirm your email',
         );
     }
+
     public function content(): Content
     {
         return new Content(
             view: 'emails.verify-email',
+            with: [
+                'email' => $this->email,
+                'token' => $this->token,
+            ],
         );
     }
 

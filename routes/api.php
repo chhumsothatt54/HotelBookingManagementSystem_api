@@ -24,8 +24,8 @@ Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Email Verification
 Route::post('/auth/mail/send', [AuthController::class, 'sendMail']);
-Route::post('/auth/mail/resend', [AuthController::class, 'resendMail']);
-Route::post('/auth/mail/confirm', [AuthController::class, 'confirmMail']);
+Route::get('/auth/mail/resend', [AuthController::class, 'resendMail']);
+Route::get('/auth/mail/confirm', [AuthController::class, 'confirmMail']);
 
 // Forgot Password
 Route::post('/auth/forgot-password', [AuthController::class, 'forgotPassword']);

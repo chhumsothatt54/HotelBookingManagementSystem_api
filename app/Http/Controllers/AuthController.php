@@ -9,9 +9,11 @@ use App\Models\PasswordResetOtp;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Exception;
 
 class AuthController extends Controller
 {
@@ -43,37 +45,33 @@ class AuthController extends Controller
         ]);
 
         // Send Email
-        Mail::to($user->email)->send(new VerifyEmailMail($token));
+        Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
 
         return response()->json([
             'message' => 'Register successful. Please verify your email.',
             'user' => $user,
-            'verification_token' => $token, // remove in production
+            'verification_token' => $token,  // remove in production
         ], 201);
     }
 
     public function sendMail(Request $request)
     {
-        $request->validate([
-            'email' => ['required', 'email'],
-        ]);
-
-        $user = User::where('email', $request->email)->first();
-
-        if (! $user) {
+        $rawEmail = $request->input('email') ?? $request->query('email');
+        if (!$rawEmail) {
+            return response()->json(['message' => 'Email parameter is required'], 400);
+        }
+        $email = str_replace(' ', '+', trim($rawEmail));
+        $user = User::where('email', $email)->first();
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
+                'debug_email_received' => $email
             ], 404);
         }
-
         if ($user->email_verified_at) {
-            return response()->json([
-                'message' => 'Email already verified',
-            ], 400);
+            return response()->json(['message' => 'Email is already verified'], 400);
         }
-
         $token = Str::random(64);
-
         EmailVerification::updateOrCreate(
             [
                 'user_id' => $user->id,
@@ -84,11 +82,17 @@ class AuthController extends Controller
                 'verified_at' => null,
             ]
         );
-
-        // Mail::to($user->email)->send(new VerifyEmailMail($token));
-
+        try {
+            Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
+        } catch (Exception $e) {
+            \Log::error('Failed to send email: ' . $e->getMessage());
+            return response()->json(['message' => 'Failed to send email logic'], 500);
+        }
+        if ($request->isMethod('get')) {
+            return redirect('https://mail.google.com/mail/u/0/#inbox');
+        }
         return response()->json([
-            'message' => 'Verification email sent',
+            'message' => 'Verification email resent successfully.',
             'verification_token' => $token,
         ]);
     }
@@ -98,42 +102,48 @@ class AuthController extends Controller
         return $this->sendMail($request);
     }
 
+
     public function confirmMail(Request $request)
     {
-        $request->validate([
-            'token' => ['required'],
-        ]);
-
-        $verification = EmailVerification::where('token', $request->token)
+        $token = $request->query('token');
+        if (!$token) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Token is required'], 400);
+            }
+            return redirect('http://localhost:5173/login?status=invalid_token');
+        }
+        $verification = EmailVerification::where('token', $token)
             ->whereNull('verified_at')
             ->first();
 
-        if (! $verification) {
-            return response()->json([
-                'message' => 'Invalid verification token',
-            ], 400);
+        if (!$verification) {
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Invalid or already used token'], 404);
+            }
+            return redirect('http://localhost:5173/login?status=invalid_token');
         }
-
         if (Carbon::parse($verification->expires_at)->isPast()) {
-            return response()->json([
-                'message' => 'Verification token expired',
-            ], 400);
+            if ($request->wantsJson()) {
+                return response()->json(['message' => 'Token has expired'], 400);
+            }
+            return redirect('http://localhost:5173/login?status=expired');
+        }
+        DB::transaction(function () use ($verification) {
+            if ($verification->user) {
+                $verification->user->update([
+                    'email_verified_at' => now(),
+                ]);
+            }
+
+            $verification->update([
+                'verified_at' => now(),
+            ]);
+        });
+        if ($request->wantsJson()) {
+            return response()->json(['message' => 'Email verified successfully']);
         }
 
-        $user = $verification->user;
-
-        $user->update([
-            'email_verified_at' => now(),
-        ]);
-
-        $verification->update([
-            'verified_at' => now(),
-        ]);
-
-        return response()->json([
-            'message' => 'Email verified successfully',
-            'user' => $user,
-        ]);
+        return redirect('http://localhost:5173/login?verified=true');
     }
 
     public function login(Request $request)
@@ -145,13 +155,13 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user || ! Hash::check($request->password, $user->password)) {
+        if (!$user || !Hash::check($request->password, $user->password)) {
             return response()->json([
                 'message' => 'Invalid email or password',
             ], 401);
         }
 
-        if (! $user->email_verified_at) {
+        if (!$user->email_verified_at) {
             return response()->json([
                 'message' => 'Please verify your email first',
             ], 403);
@@ -175,7 +185,8 @@ class AuthController extends Controller
 
     public function logout(Request $request)
     {
-        $request->user()
+        $request
+            ->user()
             ->currentAccessToken()
             ->delete();
 
@@ -192,7 +203,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
             ], 404);
@@ -216,7 +227,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'OTP sent successfully',
-            'otp' => $otp, // remove in production
+            'otp' => $otp,  // remove in production
         ]);
     }
 
@@ -234,7 +245,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
             ], 404);
@@ -246,7 +257,7 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (! $passwordResetOtp) {
+        if (!$passwordResetOtp) {
             return response()->json([
                 'message' => 'Invalid OTP',
             ], 400);
@@ -276,7 +287,7 @@ class AuthController extends Controller
 
         $user = User::where('email', $request->email)->first();
 
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
             ], 404);
@@ -287,7 +298,7 @@ class AuthController extends Controller
             ->latest()
             ->first();
 
-        if (! $otp) {
+        if (!$otp) {
             return response()->json([
                 'message' => 'Please verify OTP first',
             ], 403);
@@ -320,7 +331,7 @@ class AuthController extends Controller
 
         $user = $request->user();
 
-        if (! Hash::check(
+        if (!Hash::check(
             $request->current_password,
             $user->password
         )) {
@@ -351,14 +362,12 @@ class AuthController extends Controller
                 'min:1',
                 'max:100',
             ],
-
             'phone' => [
                 'nullable',
                 'string',
                 'min:8',
                 'max:20',
             ],
-
             'avatar' => [
                 'nullable',
                 'image',
@@ -369,7 +378,6 @@ class AuthController extends Controller
 
         // Upload avatar
         if ($request->hasFile('avatar')) {
-
             // Delete old avatar
             if (
                 $user->avatar &&
@@ -380,15 +388,15 @@ class AuthController extends Controller
 
             $file = $request->file('avatar');
 
-            $fileName = time().'_'.uniqid().'.'.
-                $file->getClientOriginalExtension();
+            $fileName = time() . '_' . uniqid() . '.'
+                . $file->getClientOriginalExtension();
 
             $file->move(
                 public_path('uploads/avatars'),
                 $fileName
             );
 
-            $validated['avatar'] = 'uploads/avatars/'.$fileName;
+            $validated['avatar'] = 'uploads/avatars/' . $fileName;
         } else {
             // Remove avatar from validated array
             unset($validated['avatar']);
