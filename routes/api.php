@@ -48,7 +48,7 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    Route::put('/update/profile',[AuthController::class,'updateProfile']);
+    Route::put('/update/profile', [AuthController::class, 'updateProfile']);
     // Logout
     Route::post('/logout', [
         AuthController::class,
@@ -60,6 +60,9 @@ Route::middleware('auth:sanctum')->group(function () {
         AuthController::class,
         'changePassword'
     ]);
+
+    //change pw
+    Route::put('/change-password', [AuthController::class, 'changePassword']);
 });
 
 /*
@@ -83,7 +86,7 @@ Route::middleware([
         'users'
     ]);
 
-    Route::get('/users/{id}',[
+    Route::get('/users/{id}', [
         AdminController::class,
         'showUser'
     ]);
@@ -93,7 +96,7 @@ Route::middleware([
         'updateUserStatus'
     ]);
 
-    Route::get('/manager',[
+    Route::get('/manager', [
         AdminController::class,
         'managers'
     ]);
@@ -178,7 +181,6 @@ Route::middleware([
         AdminController::class,
         'auditLogs'
     ]);
-
 });
 
 /*
@@ -198,8 +200,16 @@ Route::middleware(['auth:sanctum', 'manager'])
         Route::get('/hotel', [HotelManagerController::class, 'myHotel']);
         Route::post('/hotel', [HotelManagerController::class, 'storeHotel']);
         Route::put('/hotel/{id}', [HotelManagerController::class, 'updateHotel']);
+
         //  Upload Hotel Image
+        Route::get('/hotel/images', [HotelManagerController::class, 'hotelImages']);
         Route::post('/hotel/images', [HotelManagerController::class, 'uploadImage']);
+        Route::delete('/hotel/images/{id}', [HotelManagerController::class, 'deleteImage']);
+
+        //room images
+        Route::get('/room-types/{roomTypeId}/images', [HotelManagerController::class, 'roomImages']);
+        Route::post('/room-types/{roomTypeId}/images', [HotelManagerController::class, 'uploadRoomImages']);
+        Route::delete('/room-types/{imageId}', [HotelManagerController::class, 'deleteRoomImage']);
 
         // Room Types
         Route::get('/room-types', [HotelManagerController::class, 'roomTypes']);
@@ -213,10 +223,19 @@ Route::middleware(['auth:sanctum', 'manager'])
         Route::put('/rooms/{id}', [HotelManagerController::class, 'updateRoom']);
         Route::delete('/rooms/{id}', [HotelManagerController::class, 'deleteRoom']);
 
+
         // Amenities
         Route::get('/amenities', [HotelManagerController::class, 'amenities']);
-        Route::post('/amenities/{amenityId}', [HotelManagerController::class, 'attachAmenity']);
-        Route::delete('/amenities/{amenityId}', [HotelManagerController::class, 'detachAmenity']);
+
+        // Create / Update / Delete Amenity
+        Route::post('/amenities', [HotelManagerController::class, 'storeAmenity']);
+        Route::put('/amenities/{id}', [HotelManagerController::class, 'updateAmenity']);
+        Route::delete('/amenities/{id}', [HotelManagerController::class, 'deleteAmenity']);
+
+        // Connect / Disconnect Amenity to Room
+        Route::post('/rooms/{roomId}/amenities/{amenityId}',[HotelManagerController::class, 'attachAmenity']);
+        Route::delete('/rooms/{roomId}/amenities/{amenityId}',[HotelManagerController::class, 'detachAmenity']);
+
 
         // Bookings
         Route::get('/bookings', [HotelManagerController::class, 'bookings']);
@@ -229,7 +248,7 @@ Route::middleware(['auth:sanctum', 'manager'])
         // Reports
         Route::get('/reports/revenue', [HotelManagerController::class, 'revenueReport']);
         Route::get('/reports/occupancy', [HotelManagerController::class, 'occupancyReport']);
-         
+
         //all rout is 22  
     });
 
@@ -248,7 +267,7 @@ Route::prefix('v1')->group(function () {
     Route::get('/hotels/{id}', [CustomerController::class, 'hotelDetail']);
     Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'hotelRooms']);
     Route::get('/rooms/availability', [CustomerController::class, 'checkAvailability']);
-    
+
     Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); // search-by-amenity
     Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); // search-by-room
     Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); // search-by-location
@@ -270,7 +289,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/bookings/{id}/confirmation', [CustomerController::class, 'bookingConfirmation']);
             Route::patch('/bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
             Route::post('/bookings/{id}/refund', [CustomerController::class, 'requestRefund']);
-            
+
             // Hotel Review 
             Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
         });
@@ -278,12 +297,8 @@ Route::prefix('v1')->group(function () {
         // Notifications 
         Route::prefix('notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'getNotifications']);
-            Route::patch('/read-all', [CustomerController::class, 'readAllNotifications']);     
+            Route::patch('/read-all', [CustomerController::class, 'readAllNotifications']);
             Route::patch('/{id}/read', [CustomerController::class, 'readNotification']);
         });
-
     });
 });
-
-
-

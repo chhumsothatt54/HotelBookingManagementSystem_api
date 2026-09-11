@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\RoomImage;
 class RoomType extends Model
 {
     use HasFactory;
@@ -32,4 +33,9 @@ class RoomType extends Model
     {
         return $this->hasMany(Room::class);
     }
+
+    public function images()
+{
+    return $this->hasMany(RoomImage::class);
+}
 }

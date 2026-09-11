@@ -38,4 +38,18 @@ class Room extends Model
     {
         return $this->hasMany(Booking::class);
     }
+    
+    public function rooms()
+    {
+        return $this->hasMany(Room::class);
+    }
+
+    // 💡 វិធីទី ១៖ បើចង់ទាញយក Amenities ទាំងអស់របស់ Hotel តាមរយៈ Rooms របស់វា
+    public function roomAmenities()
+    {
+        return $this->hasManyThrough(
+            Room::class,
+            Hotel::class
+        );
+    }
 }
