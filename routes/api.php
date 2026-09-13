@@ -231,6 +231,9 @@ Route::middleware([
         AdminController::class,
         'auditLogs'
     ]);
+    Route::post('/profile/update', [
+        AdminController::class, 'updateProfile'
+    ]);
 });
 
 /*

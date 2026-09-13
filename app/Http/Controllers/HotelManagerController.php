@@ -939,9 +939,8 @@ public function deleteAmenity(Request $request, $id)
 
         $bookings = Booking::where('hotel_id', $hotel->id)
             ->with([
-                'user',
-                'room',
-                'roomType'
+                'customer',
+                'room.roomType'
             ])
             ->latest()
             ->paginate(15);
@@ -957,10 +956,9 @@ public function deleteAmenity(Request $request, $id)
         $booking = Booking::where('id', $id)
             ->where('hotel_id', $hotel->id)
             ->with([
-                'user',
-                'room',
-                'roomType',
-                'payment'
+                'customer',
+                'room.roomType',
+                'payments'
             ])
             ->first();
 
@@ -981,64 +979,31 @@ public function deleteAmenity(Request $request, $id)
     {
         $hotel = $this->managerHotel($request);
 
-        $booking = Booking::where('id', $id)
-            ->where('hotel_id', $hotel->id)
-            ->first();
-
-        if (!$booking) {
-            return response()->json([
-                'message' => 'Booking not found.'
-            ], 404);
-        }
+        $booking = Booking::where('hotel_id', $hotel->id)->findOrFail($id);
 
         $validated = $request->validate([
-            'status' => 'required|in:approved,rejected,cancelled,completed'
+            'status' => ['required', 'string', 'in:pending,confirmed,checked-in,checked-out,cancelled,rejected']
         ]);
 
         $newStatus = $validated['status'];
         $currentStatus = $booking->status;
 
-        /*
-        |--------------------------------------------------------------------------
-        | Enforce a state machine: only listed transitions are allowed.
-        | Anything not present as a key in BOOKING_TRANSITIONS (rejected,
-        | cancelled, completed) is terminal and can no longer change.
-        |--------------------------------------------------------------------------
-        */
-
-        $allowedNextStates = self::BOOKING_TRANSITIONS[$currentStatus] ?? [];
-
-        if (!in_array($newStatus, $allowedNextStates, true)) {
-            return response()->json([
-                'message' => "Cannot change booking status from '{$currentStatus}' to '{$newStatus}'."
-            ], 422);
-        }
-
         $booking->update([
             'status' => $newStatus
         ]);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Keep the room's status roughly in sync. A completed or cancelled
-        | booking frees the room. We deliberately do NOT force the room to
-        | 'occupied' on approval, since approval just confirms a future
-        | reservation and doesn't necessarily mean the guest has checked in
-        | today — that would need real date-range/overlap logic which is
-        | out of scope here.
-        |--------------------------------------------------------------------------
-        */
-
-        if (in_array($newStatus, ['completed', 'cancelled', 'rejected'], true) && $booking->room) {
+        if (in_array($newStatus, ['checked-out', 'cancelled', 'rejected'], true) && $booking->room) {
             $room = $booking->room;
 
-            if (in_array($room->status, ['occupied'], true)) {
+            if ($newStatus === 'cancelled' || $newStatus === 'rejected') {
                 $room->update(['status' => 'available']);
+            }
+            if ($newStatus === 'checked-out') {
+                $room->update(['status' => 'maintenance']);
             }
         }
 
         return response()->json([
-            'result' => true,
             'message' => 'Booking status updated successfully.',
             'data' => $booking
         ]);

@@ -2,15 +2,15 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Hotel;
-use App\Models\Room;
 use App\Models\Booking;
+use App\Models\Hotel;
 use App\Models\Payment;
-use App\Models\Review;
 use App\Models\RefundRequest;
+use App\Models\Review;
+use App\Models\Room;
 use App\Models\UserNotification;
-use Illuminate\Http\Request;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -27,7 +27,7 @@ class CustomerController extends Controller
             ->withAvg(['reviews' => function ($q) {
                 $q->where('status', 'approved');
             }], 'rating')
-            ->with(['roomTypes', 'images']); // ដក 'amenities' ចេញពីទីនេះ
+            ->with(['roomTypes', 'images']);  // ដក 'amenities' ចេញពីទីនេះ
 
         // Filter by Location/City
         if ($request->filled('city')) {
@@ -55,12 +55,14 @@ class CustomerController extends Controller
         if ($request->filled('sort')) {
             switch ($request->sort) {
                 case 'price_asc':
-                    $query->withMin('roomTypes', 'price_per_night')
-                          ->orderBy('room_types_min_price_per_night', 'asc');
+                    $query
+                        ->withMin('roomTypes', 'price_per_night')
+                        ->orderBy('room_types_min_price_per_night', 'asc');
                     break;
                 case 'price_desc':
-                    $query->withMax('roomTypes', 'price_per_night')
-                          ->orderBy('room_types_max_price_per_night', 'desc');
+                    $query
+                        ->withMax('roomTypes', 'price_per_night')
+                        ->orderBy('room_types_max_price_per_night', 'desc');
                     break;
                 case 'rating':
                     $query->orderByRaw('reviews_avg_rating DESC NULLS LAST');
@@ -86,8 +88,8 @@ class CustomerController extends Controller
         $query = Room::with(['hotel', 'amenities', 'roomType']);
 
         if ($request->filled('amenities')) {
-            $amenities = is_array($request->amenities) 
-                ? $request->amenities 
+            $amenities = is_array($request->amenities)
+                ? $request->amenities
                 : explode(',', $request->amenities);
 
             // បំបែករវាង IDs (លេខ) និង Names (អក្សរ) ដើម្បីការពារ SQL Syntax Error លើ PostgreSQL
@@ -115,7 +117,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Rooms retrieved successfully.',
-            'data'    => $query->paginate($request->get('per_page', 10))
+            'data' => $query->paginate($request->get('per_page', 10))
         ], 200);
     }
 
@@ -138,7 +140,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Rooms retrieved successfully.',
-            'data'    => $query->paginate($request->get('per_page', 10))
+            'data' => $query->paginate($request->get('per_page', 10))
         ], 200);
     }
 
@@ -157,7 +159,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Rooms retrieved successfully.',
-            'data'    => $query->paginate($request->get('per_page', 10))
+            'data' => $query->paginate($request->get('per_page', 10))
         ], 200);
     }
 
@@ -181,13 +183,13 @@ class CustomerController extends Controller
             ->findOrFail($id);
 
         return response()->json([
-            'id'          => $hotel->id,
-            'name'        => $hotel->name,
+            'id' => $hotel->id,
+            'name' => $hotel->name,
             'description' => $hotel->description,
-            'city'        => $hotel->city,
-            'rating'      => (float) ($hotel->reviews_avg_rating ?? 0),
-            'images'      => $hotel->images,
-            'room_types'  => $hotel->roomTypes,
+            'city' => $hotel->city,
+            'rating' => (float) ($hotel->reviews_avg_rating ?? 0),
+            'images' => $hotel->images,
+            'room_types' => $hotel->roomTypes,
         ]);
     }
 
@@ -197,7 +199,7 @@ class CustomerController extends Controller
     public function hotelRooms($hotelId)
     {
         $rooms = Room::where('hotel_id', $hotelId)
-            ->with('roomType')
+            ->with('roomType.images')
             ->get();
 
         return response()->json(['data' => $rooms]);
@@ -209,8 +211,8 @@ class CustomerController extends Controller
     public function checkAvailability(Request $request)
     {
         $request->validate([
-            'hotel_id'  => 'required|exists:hotels,id',
-            'check_in'  => 'required|date|after_or_equal:today',
+            'hotel_id' => 'required|exists:hotels,id',
+            'check_in' => 'required|date|after_or_equal:today',
             'check_out' => 'required|date|after:check_in',
         ]);
 
@@ -220,16 +222,17 @@ class CustomerController extends Controller
         $availableRooms = Room::where('hotel_id', $request->hotel_id)
             ->where('status', 'available')
             ->whereDoesntHave('bookings', function ($q) use ($checkIn, $checkOut) {
-                $q->whereIn('status', ['pending', 'approved', 'confirmed'])
-                  ->where('check_in', '<', $checkOut)
-                  ->where('check_out', '>', $checkIn);
+                $q
+                    ->whereIn('status', ['pending', 'approved', 'confirmed'])
+                    ->where('check_in', '<', $checkOut)
+                    ->where('check_out', '>', $checkIn);
             })
             ->with('roomType')
             ->get();
 
         return response()->json([
             'available_count' => $availableRooms->count(),
-            'rooms'           => $availableRooms
+            'rooms' => $availableRooms
         ]);
     }
 
@@ -239,17 +242,18 @@ class CustomerController extends Controller
     public function createBooking(Request $request)
     {
         $validated = $request->validate([
-            'hotel_id'     => 'required|exists:hotels,id',
-            'room_id'      => 'required|exists:rooms,id',
-            'guest_name'   => 'required|string|max:100',
-            'guest_phone'  => 'required|string|max:20',
-            'guest_email'  => 'required|email|max:150',
-            'check_in'     => 'required|date|after_or_equal:today',
-            'check_out'    => 'required|date|after:check_in',
+            'hotel_id' => 'required|exists:hotels,id',
+            'room_id' => 'required|exists:rooms,id',
+            'guest_name' => 'required|string|max:100',
+            'guest_phone' => 'required|string|max:20',
+            'guest_email' => 'required|email|max:150',
+            'check_in' => 'required|date|after_or_equal:today',
+            'check_out' => 'required|date|after:check_in',
             'total_guests' => 'required|integer|min:1',
         ]);
 
-        $room = Room::with('roomType')->where('id', $validated['room_id'])
+        $room = Room::with('roomType')
+            ->where('id', $validated['room_id'])
             ->where('hotel_id', $validated['hotel_id'])
             ->firstOrFail();
 
@@ -263,25 +267,25 @@ class CustomerController extends Controller
         $bookingNumber = 'BK-' . Carbon::parse($validated['check_in'])->format('Ymd') . '-' . Str::padLeft(mt_rand(1, 9999), 4, '0');
 
         $booking = Booking::create([
-            'booking_number'  => $bookingNumber,
-            'customer_id'     => $request->user()->id,
-            'hotel_id'        => $validated['hotel_id'],
-            'room_id'         => $validated['room_id'],
-            'guest_name'      => $validated['guest_name'],
-            'guest_phone'     => $validated['guest_phone'],
-            'guest_email'     => $validated['guest_email'],
-            'check_in'        => $validated['check_in'],
-            'check_out'       => $validated['check_out'],
-            'total_guests'    => $validated['total_guests'],
+            'booking_number' => $bookingNumber,
+            'customer_id' => $request->user()->id,
+            'hotel_id' => $validated['hotel_id'],
+            'room_id' => $validated['room_id'],
+            'guest_name' => $validated['guest_name'],
+            'guest_phone' => $validated['guest_phone'],
+            'guest_email' => $validated['guest_email'],
+            'check_in' => $validated['check_in'],
+            'check_out' => $validated['check_out'],
+            'total_guests' => $validated['total_guests'],
             'price_per_night' => $pricePerNight,
-            'nights'          => $nights,
-            'total_amount'    => $totalAmount,
-            'status'          => 'pending',
+            'nights' => $nights,
+            'total_amount' => $totalAmount,
+            'status' => 'pending',
         ]);
 
         return response()->json([
             'message' => 'Booking created successfully.',
-            'data'    => $booking
+            'data' => $booking
         ], 201);
     }
 
@@ -291,8 +295,8 @@ class CustomerController extends Controller
     public function createPayment(Request $request)
     {
         $validated = $request->validate([
-            'booking_id'     => 'required|exists:bookings,id',
-            'amount'         => 'required|numeric|min:0',
+            'booking_id' => 'required|exists:bookings,id',
+            'amount' => 'required|numeric|min:0',
             'payment_method' => 'required|string',
             'transaction_id' => 'required|string|unique:payments,transaction_id',
         ]);
@@ -301,19 +305,19 @@ class CustomerController extends Controller
             ->findOrFail($validated['booking_id']);
 
         $payment = Payment::create([
-    'booking_id' => $booking->id,
-    'amount' => $request->amount,
-    'payment_method' => $request->payment_method, // ប្រើ 'aba', 'acleda', 'cash' ជាដើម
-    'transaction_id' => $request->transaction_id,
-    'status' => 'paid', // <-- ត្រូវប្រើ 'paid' មិនមែន 'completed' ទេ
-    'paid_at'        => now(), // <-- បន្ថែមបន្ទាត់នេះដើម្បីសរសេរកាលបរិច្ឆេទ/ម៉ោងបច្ចុប្បន្ន
-]);
+            'booking_id' => $booking->id,
+            'amount' => $request->amount,
+            'payment_method' => $request->payment_method,  // ប្រើ 'aba', 'acleda', 'cash' ជាដើម
+            'transaction_id' => $request->transaction_id,
+            'status' => 'paid',  // <-- ត្រូវប្រើ 'paid' មិនមែន 'completed' ទេ
+            'paid_at' => now(),  // <-- បន្ថែមបន្ទាត់នេះដើម្បីសរសេរកាលបរិច្ឆេទ/ម៉ោងបច្ចុប្បន្ន
+        ]);
 
         $booking->update(['status' => 'confirmed']);
 
         return response()->json([
             'message' => 'Payment processed successfully.',
-            'data'    => $payment
+            'data' => $payment
         ], 201);
     }
 
@@ -328,18 +332,18 @@ class CustomerController extends Controller
 
         return response()->json([
             'booking_number' => $booking->booking_number,
-            'hotel'          => [
+            'hotel' => [
                 'name' => $booking->hotel->name,
             ],
-            'room'           => [
-                'room_number' => $booking->room->room_number ?? (string)$booking->room->id,
-                'room_type'   => $booking->room->roomType->name ?? 'Standard',
+            'room' => [
+                'room_number' => $booking->room->room_number ?? (string) $booking->room->id,
+                'room_type' => $booking->room->roomType->name ?? 'Standard',
             ],
-            'check_in'     => $booking->check_in->format('Y-m-d'),
-            'check_out'    => $booking->check_out->format('Y-m-d'),
-            'nights'       => $booking->nights,
-            'total_amount' => (float)$booking->total_amount,
-            'status'       => $booking->status,
+            'check_in' => $booking->check_in->format('Y-m-d'),
+            'check_out' => $booking->check_out->format('Y-m-d'),
+            'nights' => $booking->nights,
+            'total_amount' => (float) $booking->total_amount,
+            'status' => $booking->status,
         ]);
     }
 
@@ -384,13 +388,13 @@ class CustomerController extends Controller
         }
 
         $booking->update([
-            'status'        => 'cancelled',
+            'status' => 'cancelled',
             'cancel_reason' => $validated['reason'],
         ]);
 
         return response()->json([
             'message' => 'Booking cancelled successfully.',
-            'data'    => $booking
+            'data' => $booking
         ]);
     }
 
@@ -407,16 +411,16 @@ class CustomerController extends Controller
         $booking = Booking::where('customer_id', $request->user()->id)->findOrFail($id);
 
         $refund = RefundRequest::create([
-            'booking_id'  => $booking->id,
+            'booking_id' => $booking->id,
             'customer_id' => $request->user()->id,
-            'amount'      => $validated['amount'],
-            'reason'      => $validated['reason'],
-            'status'      => 'pending',
+            'amount' => $validated['amount'],
+            'reason' => $validated['reason'],
+            'status' => 'pending',
         ]);
 
         return response()->json([
             'message' => 'Refund request submitted.',
-            'data'    => $refund
+            'data' => $refund
         ], 201);
     }
 
@@ -427,8 +431,8 @@ class CustomerController extends Controller
     {
         $validated = $request->validate([
             'booking_id' => 'required|exists:bookings,id',
-            'rating'     => 'required|integer|min:1|max:5',
-            'comment'    => 'nullable|string|max:1000',
+            'rating' => 'required|integer|min:1|max:5',
+            'comment' => 'nullable|string|max:1000',
         ]);
 
         $booking = Booking::where('id', $validated['booking_id'])
@@ -437,16 +441,16 @@ class CustomerController extends Controller
 
         $review = Review::create([
             'customer_id' => $request->user()->id,
-            'hotel_id'    => $hotelId,
-            'booking_id'  => $booking->id,
-            'rating'      => $validated['rating'],
-            'comment'     => $validated['comment'] ?? null,
-            'status'      => 'pending',
+            'hotel_id' => $hotelId,
+            'booking_id' => $booking->id,
+            'rating' => $validated['rating'],
+            'comment' => $validated['comment'] ?? null,
+            'status' => 'pending',
         ]);
 
         return response()->json([
             'message' => 'Review submitted successfully.',
-            'data'    => $review
+            'data' => $review
         ], 201);
     }
 
@@ -463,9 +467,9 @@ class CustomerController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name'   => 'sometimes|string|max:255',
-            'phone'  => 'sometimes|string|max:20',
-            'email'  => [
+            'name' => 'sometimes|string|max:255',
+            'phone' => 'sometimes|string|max:20',
+            'email' => [
                 'sometimes',
                 'email',
                 'max:255',
@@ -486,7 +490,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Profile updated successfully.',
-            'data'    => $user
+            'data' => $user
         ], 200);
     }
 
@@ -501,7 +505,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Notifications retrieved successfully.',
-            'data'    => $notifications
+            'data' => $notifications
         ], 200);
     }
 
@@ -521,7 +525,7 @@ class CustomerController extends Controller
 
         return response()->json([
             'message' => 'Notification marked as read.',
-            'data'    => $notification
+            'data' => $notification
         ], 200);
     }
 
@@ -532,7 +536,7 @@ class CustomerController extends Controller
             ->update(['is_read' => true]);
 
         return response()->json([
-            'message'       => 'All notifications marked as read.',
+            'message' => 'All notifications marked as read.',
             'updated_count' => $updatedCount
         ], 200);
     }
