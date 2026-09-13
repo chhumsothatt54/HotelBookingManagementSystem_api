@@ -15,7 +15,7 @@ Route::get('/user', function (Request $request) {
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes
+| Public Authentication Routes
 |--------------------------------------------------------------------------
 */
 
@@ -49,6 +49,7 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::put('/update/profile', [AuthController::class, 'updateProfile']);
+    
     // Logout
     Route::post('/logout', [
         AuthController::class,
@@ -264,6 +265,7 @@ Route::middleware(['auth:sanctum', 'manager'])
 
         //  Upload Hotel Image
         Route::get('/hotel/images', [HotelManagerController::class, 'hotelImages']);
+        // Upload Hotel Image
         Route::post('/hotel/images', [HotelManagerController::class, 'uploadImage']);
         Route::delete('/hotel/images/{id}', [HotelManagerController::class, 'deleteImage']);
 
@@ -315,12 +317,15 @@ Route::middleware(['auth:sanctum', 'manager'])
 
 /*
 |--------------------------------------------------------------------------
-| Customer Routes
+| API v1 Routes (Public & Customer)
 |--------------------------------------------------------------------------
 */
 
-
 Route::prefix('v1')->group(function () {
+
+    // 🟢 Google OAuth Routes (បានបញ្ជូលមកក្នុង prefix v1 ត្រឹមត្រូវតាម .env)
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 
     // ------------------ Public Routes ------------------
     // Search, Filter & Sort Hotels
@@ -332,10 +337,11 @@ Route::prefix('v1')->group(function () {
     Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); // search-by-amenity
     Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); // search-by-room
     Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); // search-by-location
+
     // ------------------ Protected Routes (Auth Required) ------------------
     Route::middleware(['auth:sanctum', 'customer'])->group(function () {
 
-        // Profile Management (56)
+        // Profile Management
         Route::get('/profile', [CustomerController::class, 'getProfile']);
         Route::put('/profile', [CustomerController::class, 'updateProfile']);
 

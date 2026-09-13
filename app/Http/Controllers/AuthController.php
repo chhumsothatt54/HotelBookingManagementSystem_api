@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use Illuminate\Support\Facades\Log;
 use App\Mail\ForgotPasswordOtpMail;
 use App\Mail\VerifyEmailMail;
 use App\Models\EmailVerification;
@@ -13,6 +14,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 use Exception;
 
 class AuthController extends Controller
@@ -85,7 +87,7 @@ class AuthController extends Controller
         try {
             Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
         } catch (Exception $e) {
-            \Log::error('Failed to send email: ' . $e->getMessage());
+            Log::error('Failed to send email: ' . $e->getMessage());
             return response()->json(['message' => 'Failed to send email logic'], 500);
         }
         if ($request->isMethod('get')) {
@@ -101,7 +103,6 @@ class AuthController extends Controller
     {
         return $this->sendMail($request);
     }
-
 
     public function confirmMail(Request $request)
     {
@@ -425,6 +426,7 @@ class AuthController extends Controller
         unset($validated['avatar']);
     }
 
+<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Update User
@@ -439,4 +441,77 @@ class AuthController extends Controller
         'user' => $user->fresh(),
     ], 200);
 }
+=======
+    // ==========================================
+    // GOOGLE OAUTH METHODS
+    // ==========================================
+
+    /**
+     * Redirect ទៅកាន់ Google OAuth Login URL
+     */
+    public function redirectToGoogle()
+    {
+        // 🟢 មិនបាច់ប្រើ setHttpClient ទៀតទេ ព្រោះ config/services.php កំណត់រួចហើយ
+        $url = Socialite::driver('google')
+            ->stateless()
+            ->redirect()
+            ->getTargetUrl();
+
+        return response()->json([
+            'url' => $url,
+        ]);
+    }
+
+    /**
+     * Handle Google Callback
+     */
+    public function handleGoogleCallback()
+    {
+        try {
+            // 🟢 មិនបាច់ប្រើ setHttpClient ទៀតទេ
+            $googleUser = Socialite::driver('google')
+                ->stateless()
+                ->user();
+
+            // ស្វែងរក User តាម google_id ឬ email
+            $user = User::where('google_id', $googleUser->getId())
+                ->orWhere('email', $googleUser->getEmail())
+                ->first();
+
+            if (!$user) {
+                // ប្រសិនបើគ្មាន Account ទេ បង្កើត User ថ្មី
+                $user = User::create([
+                    'name'              => $googleUser->getName(),
+                    'email'             => $googleUser->getEmail(),
+                    'google_id'         => $googleUser->getId(),
+                    'avatar'            => $googleUser->getAvatar(),
+                    'email_verified_at' => now(), // Google Account Verify រួចជាស្រេច
+                    'role'              => 'customer',
+                    'status'            => 'active',
+                    'password'          => null,
+                ]);
+            } else {
+                // បើមាន Account ស្រាប់ ធ្វើការ Update google_id, avatar និង verify email
+                $user->update([
+                    'google_id'         => $googleUser->getId(),
+                    'avatar'            => $user->avatar ?? $googleUser->getAvatar(),
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                ]);
+            }
+
+            // បង្កើត Sanctum Token ជូន User
+            $token = $user->createToken('auth-token')->plainTextToken;
+
+            // Redirect ទៅកាន់ Vue 3 Frontend ជាមួយ Token និង User Info
+            $frontendUrl = "http://localhost:5173/auth/google/callback?token={$token}&user=" . urlencode(json_encode($user));
+
+            return redirect($frontendUrl);
+
+        } catch (Exception $e) {
+            Log::error('Google Auth Error: ' . $e->getMessage());
+
+            return redirect('http://localhost:5173/login?error=google_auth_failed');
+        }
+    }
+>>>>>>> origin/thea
 }
