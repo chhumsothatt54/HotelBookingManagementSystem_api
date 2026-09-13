@@ -6,10 +6,10 @@ use App\Models\Amenity;
 use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\Payment;
+use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomType;
 use App\Models\User;
-use App\Models\Review;
 use App\Models\UserNotification;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -17,13 +17,12 @@ use Illuminate\Support\Facades\DB;
 class AdminController extends Controller
 {
     /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Dashboard
+     * |--------------------------------------------------------------------------
+     */
     public function dashboard()
     {
-
         $totalUsers = User::count();
 
         $totalCustomers = User::where('role', 'customer')->count();
@@ -46,6 +45,7 @@ class AdminController extends Controller
             'status',
             'paid'
         )->sum('amount');
+        $totalRooms = Room::count();
 
         return response()->json([
             'result' => true,
@@ -59,21 +59,38 @@ class AdminController extends Controller
                 'total_bookings' => $totalBookings,
                 'total_payments' => $totalPayments,
                 'total_revenue' => $totalRevenue,
+                'total_rooms'=>$totalRooms
             ],
         ]);
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Users
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Users
+     * |--------------------------------------------------------------------------
+     */
 
-    public function users()
+    public function users(Request $request)
     {
-        $users = User::where('role', 'customer')->orWhere('role', 'hotel_manager')
-            ->latest()
-            ->paginate(15);
+        $query = User::whereIn('role', ['customer', 'hotel_manager']);
+
+        if ($request->filled('role')) {
+            $query->where('role', $request->role);
+        }
+
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+
+        $users = $query->latest()->paginate(15);
 
         return response()->json([
             'message' => 'Users retrieved successfully',
@@ -84,7 +101,7 @@ class AdminController extends Controller
     public function showUser($id)
     {
         $user = User::find($id);
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
             ]);
@@ -107,7 +124,7 @@ class AdminController extends Controller
             ],
         ]);
         $user = User::find($id);
-        if (! $user) {
+        if (!$user) {
             return response()->json([
                 'message' => 'User not found',
             ], 404);
@@ -123,20 +140,26 @@ class AdminController extends Controller
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Hotel Managers
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Hotel Managers
+     * |--------------------------------------------------------------------------
+     */
 
-    public function managers()
+public function managers(Request $request)
     {
-        $managers = User::where(
-            'role',
-            'hotel_manager'
-        )
-            ->with('hotels')
-            ->latest()
-            ->paginate(10);
+        $query = User::where('role', 'hotel_manager')->with('hotels');
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('name', 'like', "%{$search}%")
+                  ->orWhere('email', 'like', "%{$search}%");
+            });
+        }
+        if ($request->filled('status')) {
+            $query->where('status', $request->status);
+        }
+
+        $managers = $query->latest()->paginate(10);
 
         return response()->json([
             'message' => 'Hotel managers retrieved successfully',
@@ -160,7 +183,7 @@ class AdminController extends Controller
             'hotel_manager'
         )->find($id);
 
-        if (! $manager) {
+        if (!$manager) {
             return response()->json([
                 'message' => 'Hotel manager not found',
             ], 404);
@@ -177,10 +200,10 @@ class AdminController extends Controller
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Hotels
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Hotels
+     * |--------------------------------------------------------------------------
+     */
 
     public function hotels()
     {
@@ -203,7 +226,7 @@ class AdminController extends Controller
             'rooms',
         ])->find($id);
 
-        if (! $hotel) {
+        if (!$hotel) {
             return response()->json([
                 'message' => 'Hotel not found',
             ], 404);
@@ -227,7 +250,7 @@ class AdminController extends Controller
 
         $hotel = Hotel::find($id);
 
-        if (! $hotel) {
+        if (!$hotel) {
             return response()->json([
                 'message' => 'Hotel not found',
             ], 404);
@@ -243,11 +266,28 @@ class AdminController extends Controller
         ]);
     }
 
+    public function deleteHotel($id)
+    {
+        $hotel = Hotel::find($id);
+
+        if (!$hotel) {
+            return response()->json([
+                'message' => 'Hotel not found',
+            ], 404);
+        }
+
+        $hotel->delete();
+
+        return response()->json([
+            'message' => 'Hotel deleted successfully',
+        ]);
+    }
+
     /*
-    |--------------------------------------------------------------------------
-    | Manage Room Types
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Room Types
+     * |--------------------------------------------------------------------------
+     */
 
     public function roomTypes()
     {
@@ -259,16 +299,79 @@ class AdminController extends Controller
         ]);
     }
 
+    public function addRoomType(Request $request)
+    {
+        $request->validate([
+            'hotel_id' => 'required|exists:hotels,id',
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'max_guests' => 'required|integer',
+            'price_per_night' => 'required|numeric',
+            'status' => 'required|string',
+        ]);
+
+        $roomType = RoomType::create($request->all());
+
+        return response()->json([
+            'message' => 'Room Type created successfully',
+            'data' => $roomType,
+        ], 201);
+    }
+
+    public function updateRoomType(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'sometimes|string|max:255',
+            'description' => 'sometimes|string',
+            'max_guests' => 'sometimes|integer',
+            'price_per_night' => 'sometimes|numeric',
+            'status' => 'sometimes|string',
+        ]);
+
+        $roomType = RoomType::find($id);
+
+        if (!$roomType) {
+            return response()->json([
+                'message' => 'Room Type not found',
+            ], 404);
+        }
+
+        $roomType->update($request->all());
+
+        return response()->json([
+            'message' => 'Room Type updated successfully',
+            'data' => $roomType,
+        ]);
+    }
+
+    public function deleteRoomType($id)
+    {
+        $roomType = RoomType::find($id);
+
+        if (!$roomType) {
+            return response()->json([
+                'message' => 'Room Type not found',
+            ], 404);
+        }
+
+        $roomType->delete();
+
+        return response()->json([
+            'message' => 'Room Type deleted successfully',
+        ]);
+    }
+
     /*
-    |--------------------------------------------------------------------------
-    | Manage Rooms
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Rooms
+     * |--------------------------------------------------------------------------
+     */
 
     public function rooms()
     {
         $room = Room::with('hotel', 'roomType', 'amenities')
-            ->latest()->paginate(10);
+            ->latest()
+            ->paginate(10);
 
         return response()->json([
             'message' => 'Room retrieved successfully',
@@ -276,16 +379,111 @@ class AdminController extends Controller
         ]);
     }
 
+    public function addRoom(Request $request)
+    {
+        $request->validate([
+            'hotel_id' => 'required|exists:hotels,id',
+            'room_type_id' => 'required|exists:room_types,id',
+            'room_number' => 'required|string|max:20',
+            'floor' => 'nullable|integer',
+            'status' => 'required|in:available,maintenance,inactive',
+            'price_per_night' => 'nullable|numeric',
+        ]);
+
+        $existingRoom = Room::where('hotel_id', $request->hotel_id)
+            ->where('room_number', $request->room_number)
+            ->first();
+
+        if ($existingRoom) {
+            return response()->json([
+                'message' => 'Room number already exists in this hotel',
+            ], 422);
+        }
+
+        $room = Room::create($request->all());
+
+        if ($request->has('amenities')) {
+            $room->amenities()->sync($request->amenities);
+        }
+
+        return response()->json([
+            'message' => 'Room created successfully',
+            'data' => $room->load('hotel', 'roomType', 'amenities'),
+        ], 201);
+    }
+
+    public function updateRoom(Request $request, $id)
+    {
+        $request->validate([
+            'hotel_id' => 'sometimes|exists:hotels,id',
+            'room_type_id' => 'sometimes|exists:room_types,id',
+            'room_number' => 'sometimes|string|max:20',
+            'floor' => 'nullable|integer',
+            'status' => 'sometimes|in:available,maintenance,inactive',
+            'price_per_night' => 'sometimes|numeric',
+        ]);
+
+        $room = Room::find($id);
+
+        if (!$room) {
+            return response()->json([
+                'message' => 'Room not found',
+            ], 404);
+        }
+
+        if ($request->has('room_number') && $request->room_number !== $room->room_number) {
+            $hotelId = $request->hotel_id ?? $room->hotel_id;
+            $existingRoom = Room::where('hotel_id', $hotelId)
+                ->where('room_number', $request->room_number)
+                ->first();
+
+            if ($existingRoom) {
+                return response()->json([
+                    'message' => 'Room number already exists in this hotel',
+                ], 422);
+            }
+        }
+
+        $room->update($request->all());
+
+        if ($request->has('amenities')) {
+            $room->amenities()->sync($request->amenities);
+        }
+
+        return response()->json([
+            'message' => 'Room updated successfully',
+            'data' => $room->load('hotel', 'roomType', 'amenities'),
+        ]);
+    }
+
+    public function deleteRoom($id)
+    {
+        $room = Room::find($id);
+
+        if (!$room) {
+            return response()->json([
+                'message' => 'Room not found',
+            ], 404);
+        }
+
+        $room->delete();
+
+        return response()->json([
+            'message' => 'Room deleted successfully',
+        ]);
+    }
+
     /*
-    |--------------------------------------------------------------------------
-    | Manage Amenities
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Amenities
+     * |--------------------------------------------------------------------------
+     */
 
     public function amenities()
     {
         $amenity = Amenity::with('rooms')
-            ->latest()->paginate(10);
+            ->latest()
+            ->paginate(10);
 
         return response()->json([
             'message' => 'Amenity Retrieved Successfully',
@@ -293,13 +491,70 @@ class AdminController extends Controller
         ]);
     }
 
-    //====noted
+    public function addAmenity(Request $request)
+    {
+        $request->validate([
+            'name' => 'required|string|max:200',
+            'icon' => 'string|max:150',
+            'description' => 'required|string',
+            'status' => 'required|in:active,inactive',
+        ]);
+
+        $amenity = Amenity::create($request->all());
+
+        return response()->json([
+            'message' => 'Amenity created successfully',
+            'data' => $amenity,
+        ], 201);
+    }
+
+    public function updateAmenity(Request $request, $id)
+    {
+        $request->validate([
+            'name' => 'sometimes|string|max:200',
+            'icon' => 'sometimes|string|max:150',
+            'description' => 'sometimes|string',
+            'status' => 'sometimes|in:active,inactive',
+        ]);
+
+        $amenity = Amenity::find($id);
+
+        if (!$amenity) {
+            return response()->json([
+                'message' => 'Amenity not found',
+            ], 404);
+        }
+
+        $amenity->update($request->all());
+
+        return response()->json([
+            'message' => 'Amenity updated successfully',
+            'data' => $amenity,
+        ]);
+    }
+
+    public function deleteAmenity($id)
+    {
+        $amenity = Amenity::find($id);
+
+        if (!$amenity) {
+            return response()->json([
+                'message' => 'Amenity not found',
+            ], 404);
+        }
+
+        $amenity->delete();
+
+        return response()->json([
+            'message' => 'Amenity deleted successfully',
+        ]);
+    }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Bookings
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Bookings
+     * |--------------------------------------------------------------------------
+     */
 
     public function bookings()
     {
@@ -328,7 +583,7 @@ class AdminController extends Controller
             'review',
         ])->find($id);
 
-        if (! $booking) {
+        if (!$booking) {
             return response()->json([
                 'message' => 'Booking not found',
             ], 404);
@@ -340,10 +595,10 @@ class AdminController extends Controller
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Payments
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Payments
+     * |--------------------------------------------------------------------------
+     */
 
     public function payments()
     {
@@ -361,10 +616,10 @@ class AdminController extends Controller
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Reviews
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Reviews
+     * |--------------------------------------------------------------------------
+     */
 
     public function reviews()
     {
@@ -412,42 +667,42 @@ class AdminController extends Controller
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Revenue Report
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Revenue Report
+     * |--------------------------------------------------------------------------
+     */
 
-public function revenueReport()
-{
-    $totalRevenue = Payment::where('status', 'paid')
-        ->sum('amount');
+    public function revenueReport()
+    {
+        $totalRevenue = Payment::where('status', 'paid')
+            ->sum('amount');
 
-    $monthlyRevenue = Payment::select(
+        $monthlyRevenue = Payment::select(
             DB::raw('EXTRACT(MONTH FROM paid_at) as month'),
             DB::raw('EXTRACT(YEAR FROM paid_at) as year'),
             DB::raw('SUM(amount) as total')
         )
-        ->where('status', 'paid')
-        ->groupBy(
-            DB::raw('EXTRACT(YEAR FROM paid_at)'),
-            DB::raw('EXTRACT(MONTH FROM paid_at)')
-        )
-        ->orderByDesc('year')
-        ->orderByDesc('month')
-        ->get();
+            ->where('status', 'paid')
+            ->groupBy(
+                DB::raw('EXTRACT(YEAR FROM paid_at)'),
+                DB::raw('EXTRACT(MONTH FROM paid_at)')
+            )
+            ->orderByDesc('year')
+            ->orderByDesc('month')
+            ->get();
 
-    return response()->json([
-        'message' => 'Revenue report retrieved successfully',
-        'total_revenue' => $totalRevenue,
-        'monthly_revenue' => $monthlyRevenue
-    ]);
-}
+        return response()->json([
+            'message' => 'Revenue report retrieved successfully',
+            'total_revenue' => $totalRevenue,
+            'monthly_revenue' => $monthlyRevenue
+        ]);
+    }
 
     /*
-    |--------------------------------------------------------------------------
-    | Occupancy Report
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Occupancy Report
+     * |--------------------------------------------------------------------------
+     */
 
     public function occupancyReport()
     {
@@ -470,15 +725,15 @@ public function revenueReport()
         return response()->json([
             'total_rooms' => $totalRooms,
             'occupied_rooms' => $occupiedRooms,
-            'occupancy_rate' => $occupancyRate.'%',
+            'occupancy_rate' => $occupancyRate . '%',
         ]);
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Manage Notifications
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Manage Notifications
+     * |--------------------------------------------------------------------------
+     */
 
     public function notifications()
     {
@@ -493,10 +748,10 @@ public function revenueReport()
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Audit Logs
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Audit Logs
+     * |--------------------------------------------------------------------------
+     */
 
     public function auditLogs()
     {

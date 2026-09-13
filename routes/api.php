@@ -121,9 +121,29 @@ Route::middleware([
         'updateHotelStatus'
     ]);
 
+    Route::delete('/hotels/{id}', [
+        AdminController::class,
+        'deleteHotel'
+    ]);
+
     Route::get('/room-types', [
         AdminController::class,
         'roomTypes'
+    ]);
+
+    Route::post('/room-types', [
+        AdminController::class,
+        'addRoomType'
+    ]);
+
+    Route::put('/room-types/{id}', [
+        AdminController::class,
+        'updateRoomType'
+    ]);
+
+    Route::delete('/room-types/{id}', [
+        AdminController::class,
+        'deleteRoomType'
     ]);
 
     Route::get('/rooms', [
@@ -131,11 +151,40 @@ Route::middleware([
         'rooms'
     ]);
 
+    Route::post('/rooms', [
+        AdminController::class,
+        'addRoom'
+    ]);
+
+    Route::put('/rooms/{id}', [
+        AdminController::class,
+        'updateRoom'
+    ]);
+
+    Route::delete('/rooms/{id}', [
+        AdminController::class,
+        'deleteRoom'
+    ]);
+
     Route::get('/amenities', [
         AdminController::class,
         'amenities'
     ]);
-    // noted
+
+    Route::post('/amenities', [
+        AdminController::class,
+        'addAmenity'
+    ]);
+
+    Route::put('/amenities/{id}', [
+        AdminController::class,
+        'updateAmenity'
+    ]);
+
+    Route::delete('/amenities/{id}', [
+        AdminController::class,
+        'deleteAmenity'
+    ]);
 
     Route::get('/bookings', [
         AdminController::class,
