@@ -253,6 +253,44 @@ class HotelManagerController extends Controller
             'data' => $images,
         ]);
     }
+    public function updateProfile(Request $request)
+{
+    $user = $request->user();
+
+    $request->validate([
+        'name' => 'required|string|max:255',
+        'email' => 'nullable|email|max:255',
+        'phone' => 'nullable|string|max:30',
+        'avatar' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
+    ]);
+
+    $user->name = $request->name;
+    $user->email = $request->email;
+    $user->phone = $request->phone;
+
+    if ($request->hasFile('avatar')) {
+
+        // Delete old avatar
+        if ($user->avatar) {
+            Storage::disk('public')->delete($user->avatar);
+        }
+
+        // Save new avatar
+        $path = $request->file('avatar')->store(
+            'avatars',
+            'public'
+        );
+
+        $user->avatar = $path;
+    }
+
+    $user->save();
+
+    return response()->json([
+        'message' => 'Profile updated successfully.',
+        'user' => $user,
+    ]);
+}
 
 
     public function uploadImage(Request $request)

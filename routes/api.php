@@ -245,6 +245,17 @@ Route::middleware(['auth:sanctum', 'manager'])
         // Dashboard
         Route::get('/dashboard', [HotelManagerController::class, 'dashboard']);
 
+        Route::get('/me', function (Request $request) {
+            return response()->json([
+                'user' => $request->user()
+            ]);
+        });
+
+        Route::post('/me/profile', [
+            AuthController::class,
+            'updateProfile'
+        ]);
+
         // Hotel Profile
         Route::get('/hotel', [HotelManagerController::class, 'myHotel']);
         Route::post('/hotel', [HotelManagerController::class, 'createHotel']);

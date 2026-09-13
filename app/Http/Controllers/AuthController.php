@@ -350,64 +350,93 @@ class AuthController extends Controller
     }
 
     public function updateProfile(Request $request)
-    {
-        // Get currently authenticated user
-        $user = $request->user();
+{
+    $user = $request->user();
 
-        // Validate input
-        $validated = $request->validate([
-            'name' => [
-                'required',
-                'string',
-                'min:1',
-                'max:100',
-            ],
-            'phone' => [
-                'nullable',
-                'string',
-                'min:8',
-                'max:20',
-            ],
-            'avatar' => [
-                'nullable',
-                'image',
-                'mimes:jpg,jpeg,png,webp',
-                'max:2048',
-            ],
-        ]);
+    $validated = $request->validate([
+        'name' => [
+            'required',
+            'string',
+            'min:1',
+            'max:100',
+        ],
 
-        // Upload avatar
-        if ($request->hasFile('avatar')) {
-            // Delete old avatar
-            if (
-                $user->avatar &&
-                file_exists(public_path($user->avatar))
-            ) {
-                unlink(public_path($user->avatar));
-            }
+        'email' => [
+            'nullable',
+            'email',
+            'max:150',
+        ],
 
-            $file = $request->file('avatar');
+        'phone' => [
+            'nullable',
+            'string',
+            'min:8',
+            'max:20',
+        ],
 
-            $fileName = time() . '_' . uniqid() . '.'
-                . $file->getClientOriginalExtension();
+        'avatar' => [
+            'nullable',
+            'file',
+            'mimes:jpg,jpeg,png,webp',
+            'max:2048',
+        ],
+    ]);
 
-            $file->move(
-                public_path('uploads/avatars'),
-                $fileName
-            );
+    /*
+    |--------------------------------------------------------------------------
+    | Upload Avatar
+    |--------------------------------------------------------------------------
+    */
 
-            $validated['avatar'] = 'uploads/avatars/' . $fileName;
-        } else {
-            // Remove avatar from validated array
-            unset($validated['avatar']);
+    if ($request->hasFile('avatar')) {
+
+        // Delete old avatar
+        if (
+            $user->avatar &&
+            file_exists(public_path($user->avatar))
+        ) {
+            unlink(public_path($user->avatar));
         }
 
-        // Update profile
-        $user->update($validated);
+        $file = $request->file('avatar');
 
-        return response()->json([
-            'message' => 'Profile updated successfully',
-            'data' => $user->fresh(),
-        ], 200);
+        $fileName = time()
+            . '_'
+            . uniqid()
+            . '.'
+            . $file->getClientOriginalExtension();
+
+        // Make sure directory exists
+        $uploadPath = public_path('uploads/avatars');
+
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0755, true);
+        }
+
+        // Move new avatar
+        $file->move(
+            $uploadPath,
+            $fileName
+        );
+
+        // Save relative path in database
+        $validated['avatar'] = 'uploads/avatars/' . $fileName;
+    } else {
+        unset($validated['avatar']);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Update User
+    |--------------------------------------------------------------------------
+    */
+
+    $user->update($validated);
+
+    return response()->json([
+        'message' => 'Profile updated successfully',
+
+        'user' => $user->fresh(),
+    ], 200);
+}
 }
