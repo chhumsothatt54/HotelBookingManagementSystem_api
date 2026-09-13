@@ -15,7 +15,7 @@ Route::get('/user', function (Request $request) {
 
 /*
 |--------------------------------------------------------------------------
-| Public Routes
+| Public Authentication Routes
 |--------------------------------------------------------------------------
 */
 
@@ -48,7 +48,8 @@ Route::middleware('auth:sanctum')->group(function () {
         ]);
     });
 
-    Route::put('/update/profile',[AuthController::class,'updateProfile']);
+    Route::put('/update/profile', [AuthController::class, 'updateProfile']);
+    
     // Logout
     Route::post('/logout', [
         AuthController::class,
@@ -83,7 +84,7 @@ Route::middleware([
         'users'
     ]);
 
-    Route::get('/users/{id}',[
+    Route::get('/users/{id}', [
         AdminController::class,
         'showUser'
     ]);
@@ -93,7 +94,7 @@ Route::middleware([
         'updateUserStatus'
     ]);
 
-    Route::get('/manager',[
+    Route::get('/manager', [
         AdminController::class,
         'managers'
     ]);
@@ -132,7 +133,6 @@ Route::middleware([
         AdminController::class,
         'amenities'
     ]);
-    // noted
 
     Route::get('/bookings', [
         AdminController::class,
@@ -198,7 +198,7 @@ Route::middleware(['auth:sanctum', 'manager'])
         Route::get('/hotel', [HotelManagerController::class, 'myHotel']);
         Route::post('/hotel', [HotelManagerController::class, 'storeHotel']);
         Route::put('/hotel/{id}', [HotelManagerController::class, 'updateHotel']);
-        //  Upload Hotel Image
+        // Upload Hotel Image
         Route::post('/hotel/images', [HotelManagerController::class, 'uploadImage']);
 
         // Room Types
@@ -229,18 +229,20 @@ Route::middleware(['auth:sanctum', 'manager'])
         // Reports
         Route::get('/reports/revenue', [HotelManagerController::class, 'revenueReport']);
         Route::get('/reports/occupancy', [HotelManagerController::class, 'occupancyReport']);
-         
-        //all rout is 22  
+
     });
 
 /*
 |--------------------------------------------------------------------------
-| Customer Routes
+| API v1 Routes (Public & Customer)
 |--------------------------------------------------------------------------
 */
 
-
 Route::prefix('v1')->group(function () {
+
+    // 🟢 Google OAuth Routes (បានបញ្ជូលមកក្នុង prefix v1 ត្រឹមត្រូវតាម .env)
+    Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 
     // ------------------ Public Routes ------------------
     // Search, Filter & Sort Hotels
@@ -248,14 +250,15 @@ Route::prefix('v1')->group(function () {
     Route::get('/hotels/{id}', [CustomerController::class, 'hotelDetail']);
     Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'hotelRooms']);
     Route::get('/rooms/availability', [CustomerController::class, 'checkAvailability']);
-    
+
     Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); // search-by-amenity
     Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); // search-by-room
     Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); // search-by-location
+
     // ------------------ Protected Routes (Auth Required) ------------------
     Route::middleware(['auth:sanctum', 'customer'])->group(function () {
 
-        // Profile Management (56)
+        // Profile Management
         Route::get('/profile', [CustomerController::class, 'getProfile']);
         Route::put('/profile', [CustomerController::class, 'updateProfile']);
 
@@ -270,7 +273,7 @@ Route::prefix('v1')->group(function () {
             Route::get('/bookings/{id}/confirmation', [CustomerController::class, 'bookingConfirmation']);
             Route::patch('/bookings/{id}/cancel', [CustomerController::class, 'cancelBooking']);
             Route::post('/bookings/{id}/refund', [CustomerController::class, 'requestRefund']);
-            
+
             // Hotel Review 
             Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
         });
@@ -278,12 +281,9 @@ Route::prefix('v1')->group(function () {
         // Notifications 
         Route::prefix('notifications')->group(function () {
             Route::get('/', [CustomerController::class, 'getNotifications']);
-            Route::patch('/read-all', [CustomerController::class, 'readAllNotifications']);     
+            Route::patch('/read-all', [CustomerController::class, 'readAllNotifications']);
             Route::patch('/{id}/read', [CustomerController::class, 'readNotification']);
         });
 
     });
 });
-
-
-
