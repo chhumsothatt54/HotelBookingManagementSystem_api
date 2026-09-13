@@ -426,7 +426,6 @@ class AuthController extends Controller
         unset($validated['avatar']);
     }
 
-<<<<<<< HEAD
     /*
     |--------------------------------------------------------------------------
     | Update User
@@ -441,7 +440,6 @@ class AuthController extends Controller
         'user' => $user->fresh(),
     ], 200);
 }
-=======
     // ==========================================
     // GOOGLE OAUTH METHODS
     // ==========================================
@@ -513,5 +511,4 @@ class AuthController extends Controller
             return redirect('http://localhost:5173/login?error=google_auth_failed');
         }
     }
->>>>>>> origin/thea
 }
