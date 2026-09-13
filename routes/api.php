@@ -247,8 +247,9 @@ Route::middleware(['auth:sanctum', 'manager'])
 
         // Hotel Profile
         Route::get('/hotel', [HotelManagerController::class, 'myHotel']);
-        Route::post('/hotel', [HotelManagerController::class, 'storeHotel']);
+        Route::post('/hotel', [HotelManagerController::class, 'createHotel']);
         Route::put('/hotel/{id}', [HotelManagerController::class, 'updateHotel']);
+        Route::delete('/hotel/{id}', [HotelManagerController::class, 'deleteHotel']);
 
         //  Upload Hotel Image
         Route::get('/hotel/images', [HotelManagerController::class, 'hotelImages']);

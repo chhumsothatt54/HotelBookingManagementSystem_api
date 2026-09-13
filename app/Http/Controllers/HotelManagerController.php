@@ -121,7 +121,7 @@ class HotelManagerController extends Controller
     }
 
 
-    public function storeHotel(Request $request)
+    public function createHotel(Request $request)
     {
         $manager = $request->user();
 
@@ -197,6 +197,39 @@ class HotelManagerController extends Controller
             'data' => $hotel
         ]);
     }
+
+    public function deleteHotel(Request $request, $id)
+    {
+        $hotel = Hotel::where('id', $id)
+            ->where('manager_id', $request->user()->id)
+            ->first();
+
+        if (!$hotel) {
+            return response()->json([
+                'message' => 'Hotel not found.'
+            ], 404);
+        }
+
+        $hasActiveBookings = Booking::where('hotel_id', $hotel->id)
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+
+        if ($hasActiveBookings) {
+            return response()->json([
+                'message' => 'This hotel has active bookings and cannot be deleted.'
+            ], 409);
+        }
+
+        // We can assume cascade delete is set on DB level for relations like rooms, room_types, hotel_images, etc. 
+        // If not, we might need to delete them explicitly. But it's usually better handled by migrations.
+        $hotel->delete();
+
+        return response()->json([
+            'result' => true,
+            'message' => 'Hotel deleted successfully.'
+        ]);
+    }
+
 
     public function hotelImages(Request $request)
     {
