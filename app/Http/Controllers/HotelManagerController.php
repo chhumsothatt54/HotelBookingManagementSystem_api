@@ -388,98 +388,101 @@ class HotelManagerController extends Controller
 
 
     public function storeRoomType(Request $request)
-    {
-        $hotel = $this->managerHotel($request);
+{
+    $hotel = $this->managerHotel($request);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'capacity' => 'required|integer|min:1',
-            'price' => 'required|numeric|min:0',
-        ]);
+    $validated = $request->validate([
+        'name'            => 'required|string|max:255',
+        'description'     => 'nullable|string',
+        'max_guests'      => 'required|integer|min:1',       // កែពី capacity -> max_guests
+        'price_per_night' => 'required|numeric|min:0',       // កែពី price -> price_per_night
+        'status'          => 'nullable|string',
+    ]);
 
-        $validated['hotel_id'] = $hotel->id;
+    $validated['hotel_id'] = $hotel->id;
 
-        $roomType = RoomType::create($validated);
+    $roomType = RoomType::create($validated);
 
+    return response()->json([
+        'result'  => true,
+        'message' => 'Room type created successfully.',
+        'data'    => $roomType
+    ], 201);
+}
+
+public function updateRoomType(Request $request, $id)
+{
+    $hotel = $this->managerHotel($request);
+
+    $roomType = RoomType::where('id', $id)
+        ->where('hotel_id', $hotel->id)
+        ->first();
+
+    if (!$roomType) {
         return response()->json([
-            'result' => true,
-            'message' => 'Room type created successfully.',
-            'data' => $roomType
-        ], 201);
+            'message' => 'Room type not found.'
+        ], 404);
     }
 
+    $validated = $request->validate([
+        'name'            => 'sometimes|required|string|max:255',
+        'description'     => 'nullable|string',
+        'max_guests'      => 'sometimes|required|integer|min:1',
+        'price_per_night' => 'sometimes|required|numeric|min:0',
+        'status'          => 'sometimes|nullable|string',
+    ]);
 
-    public function updateRoomType(Request $request, $id)
-    {
-        $hotel = $this->managerHotel($request);
+    $roomType->update($validated);
 
-        $roomType = RoomType::where('id', $id)
-            ->where('hotel_id', $hotel->id)
-            ->first();
-
-        if (!$roomType) {
-            return response()->json([
-                'message' => 'Room type not found.'
-            ], 404);
-        }
-
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'max_guests' => 'sometimes|required|integer|min:1',
-            'price_per_night' => 'sometimes|required|numeric|min:0',
-        ]);
-
-        $roomType->update($validated);
-
-        return response()->json([
-            'result' => true,
-            'message' => 'Room type updated successfully.',
-            'data' => $roomType
-        ]);
-    }
+    return response()->json([
+        'result'  => true,
+        'message' => 'Room type updated successfully.',
+        'data'    => $roomType
+    ]);
+}
 
 
     public function deleteRoomType(Request $request, $id)
-    {
-        $hotel = $this->managerHotel($request);
+{
+    $hotel = $this->managerHotel($request);
 
-        $roomType = RoomType::where('id', $id)
-            ->where('hotel_id', $hotel->id)
-            ->first();
+    // លុប dd(...) ចេញ
 
-        if (!$roomType) {
-            return response()->json([
-                'message' => 'Room type not found.'
-            ], 404);
-        }
+    $roomType = RoomType::where('id', $id)
+        ->where('hotel_id', $hotel->id)
+        ->first();
 
-        // Check whether rooms using this room type have active bookings
-        $hasBookings = Booking::whereHas('room', function ($query) use ($roomType) {
-            $query->where('room_type_id', $roomType->id);
-        })
-            ->whereIn('status', ['pending', 'approved'])
-            ->exists();
-
-        if ($hasBookings) {
-            return response()->json([
-                'message' => 'Cannot delete this room type because it has active bookings.'
-            ], 422);
-        }
-
-        // Delete rooms belonging to this room type
-        Room::where('room_type_id', $roomType->id)
-            ->where('hotel_id', $hotel->id)
-            ->delete();
-
-        $roomType->delete();
-
+    if (!$roomType) {
         return response()->json([
-            'result' => true,
-            'message' => 'Room type deleted successfully.'
-        ]);
+            'message' => 'Room type not found.'
+        ], 404);
     }
+
+    // ពិនិត្យមើលថាតើមានការកក់ (Booking) សកម្មដែរឬទេ
+    $hasBookings = Booking::whereHas('room', function ($query) use ($roomType) {
+        $query->where('room_type_id', $roomType->id);
+    })
+        ->whereIn('status', ['pending', 'approved'])
+        ->exists();
+
+    if ($hasBookings) {
+        return response()->json([
+            'message' => 'Cannot delete this room type because it has active bookings.'
+        ], 422);
+    }
+
+    // លុបបន្ទប់ទាំងឡាយណាដែលស្ថិតនៅក្នុង Room Type នេះ
+    Room::where('room_type_id', $roomType->id)
+        ->where('hotel_id', $hotel->id)
+        ->delete();
+
+    $roomType->delete();
+
+    return response()->json([
+        'result' => true,
+        'message' => 'Room type deleted successfully.'
+    ]);
+}
 
 
     /*
@@ -561,6 +564,7 @@ class HotelManagerController extends Controller
             'room_number' => 'sometimes|required|string|max:50',
             'floor' => 'nullable|integer',
             'status' => 'sometimes|required|in:available,maintenance,inactive',
+
         ]);
 
         /*
