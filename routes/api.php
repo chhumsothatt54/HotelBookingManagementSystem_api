@@ -275,7 +275,7 @@ Route::middleware(['auth:sanctum', 'manager'])
         //room images
         Route::get('/room-types/{roomTypeId}/images', [HotelManagerController::class, 'roomImages']);
         Route::post('/room-types/{roomTypeId}/images', [HotelManagerController::class, 'uploadRoomImages']);
-        Route::delete('/room-types/{imageId}', [HotelManagerController::class, 'deleteRoomImage']);
+        Route::delete('/room-images/{imageId}', [HotelManagerController::class, 'deleteRoomImage']);
 
         // Room Types
         Route::get('/room-types', [HotelManagerController::class, 'roomTypes']);
