@@ -7,7 +7,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\HotelController;
 use App\Http\Controllers\HotelManagerController;
-use App\Http\Controllers\Review;
+use App\Http\Controllers\Api\BakongPaymentController; // ហៅចូល BakongPaymentController
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -266,9 +266,8 @@ Route::middleware(['auth:sanctum', 'manager'])
         Route::put('/hotel/{id}', [HotelManagerController::class, 'updateHotel']);
         Route::delete('/hotel/{id}', [HotelManagerController::class, 'deleteHotel']);
 
-        //  Upload Hotel Image
-        Route::get('/hotel/images', [HotelManagerController::class, 'hotelImages']);
         // Upload Hotel Image
+        Route::get('/hotel/images', [HotelManagerController::class, 'hotelImages']);
         Route::post('/hotel/images', [HotelManagerController::class, 'uploadImage']);
         Route::delete('/hotel/images/{id}', [HotelManagerController::class, 'deleteImage']);
 
@@ -289,11 +288,8 @@ Route::middleware(['auth:sanctum', 'manager'])
         Route::put('/rooms/{id}', [HotelManagerController::class, 'updateRoom']);
         Route::delete('/rooms/{id}', [HotelManagerController::class, 'deleteRoom']);
 
-
         // Amenities
         Route::get('/amenities', [HotelManagerController::class, 'amenities']);
-
-        // Create / Update / Delete Amenity
         Route::post('/amenities', [HotelManagerController::class, 'storeAmenity']);
         Route::put('/amenities/{id}', [HotelManagerController::class, 'updateAmenity']);
         Route::delete('/amenities/{id}', [HotelManagerController::class, 'deleteAmenity']);
@@ -301,7 +297,6 @@ Route::middleware(['auth:sanctum', 'manager'])
         // Connect / Disconnect Amenity to Room
         Route::post('/rooms/{roomId}/amenities/{amenityId}',[HotelManagerController::class, 'attachAmenity']);
         Route::delete('/rooms/{roomId}/amenities/{amenityId}',[HotelManagerController::class, 'detachAmenity']);
-
 
         // Bookings
         Route::get('/bookings', [HotelManagerController::class, 'bookings']);
@@ -314,8 +309,6 @@ Route::middleware(['auth:sanctum', 'manager'])
         // Reports
         Route::get('/reports/revenue', [HotelManagerController::class, 'revenueReport']);
         Route::get('/reports/occupancy', [HotelManagerController::class, 'occupancyReport']);
-
-        //all rout is 22  
     });
 
 /*
@@ -326,20 +319,19 @@ Route::middleware(['auth:sanctum', 'manager'])
 
 Route::prefix('v1')->group(function () {
 
-    // 🟢 Google OAuth Routes (បានបញ្ជូលមកក្នុង prefix v1 ត្រឹមត្រូវតាម .env)
+    // Google OAuth Routes
     Route::get('/auth/google', [AuthController::class, 'redirectToGoogle']);
     Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback']);
 
     // ------------------ Public Routes ------------------
-    // Search, Filter & Sort Hotels
     Route::get('/hotels', [CustomerController::class, 'hotels']);
     Route::get('/hotels/{id}', [CustomerController::class, 'hotelDetail']);
     Route::get('/hotels/{hotelId}/rooms', [CustomerController::class, 'hotelRooms']);
     Route::get('/rooms/availability', [CustomerController::class, 'checkAvailability']);
 
-    Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); // search-by-amenity
-    Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); // search-by-room
-    Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); // search-by-location
+    Route::get('/rooms/search', [CustomerController::class, 'searchRooms']); 
+    Route::get('/rooms/search-by-room', [CustomerController::class, 'searchByRoom']); 
+    Route::get('/rooms/search-by-location', [CustomerController::class, 'searchByLocation']); 
 
     // ------------------ Protected Routes (Auth Required) ------------------
     Route::middleware(['auth:sanctum', 'customer'])->group(function () {
@@ -351,6 +343,13 @@ Route::prefix('v1')->group(function () {
         // Booking Process 
         Route::post('/bookings', [CustomerController::class, 'createBooking']);
         Route::post('/payments', [CustomerController::class, 'createPayment']);
+
+        // ========================================================
+        // BAKONG KHQR PAYMENT ROUTES (Added for Checkout & Polling)
+        // ========================================================
+        Route::post('/booking/{id}/generate-qr', [BakongPaymentController::class, 'generateQR']);
+        Route::get('/booking/{id}/check-status', [BakongPaymentController::class, 'checkPaymentStatus']);
+        Route::post('/booking/{id}/mock-success', [BakongPaymentController::class, 'mockPaymentSuccess']); // សម្រាប់ Demo បម្រុងទុក
 
         // Customer Bookings 
         Route::prefix('customer')->group(function () {
