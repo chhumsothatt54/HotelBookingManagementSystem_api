@@ -20,6 +20,7 @@ Route::get('/user', function (Request $request) {
 */
 
 Route::post('/auth/register', [AuthController::class, 'register']);
+Route::post('/auth/register-mg', [AuthController::class, 'registerMg']);
 Route::post('/auth/login', [AuthController::class, 'login']);
 
 // Email Verification

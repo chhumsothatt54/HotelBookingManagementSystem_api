@@ -59,7 +59,7 @@ class AdminController extends Controller
      * | Dashboard
      * |--------------------------------------------------------------------------
      */
-    public function dashboard()
+public function dashboard()
     {
         $totalUsers = User::count();
 
@@ -84,6 +84,7 @@ class AdminController extends Controller
             'paid'
         )->sum('amount');
         $totalRooms = Room::count();
+        $pendingHotelsList = Hotel::with('manager')->where('status', 'pending')->limit(5)->get();
 
         return response()->json([
             'result' => true,
@@ -94,6 +95,7 @@ class AdminController extends Controller
                 'total_manager' => $totalManagers,
                 'total_hotels' => $totalHotels,
                 'pending_hotels' => $pendingHotels,
+                'pending_hotels_list' => $pendingHotelsList,
                 'total_bookings' => $totalBookings,
                 'total_payments' => $totalPayments,
                 'total_revenue' => $totalRevenue,
@@ -101,7 +103,6 @@ class AdminController extends Controller
             ],
         ]);
     }
-
     /*
      * |--------------------------------------------------------------------------
      * | Manage Users
@@ -745,6 +746,7 @@ public function managers(Request $request)
     public function occupancyReport()
     {
         $totalRooms = Room::count();
+        $pendingHotelsList = Hotel::with('manager')->where('status', 'pending')->limit(5)->get();
 
         $occupiedRooms = Booking::whereIn(
             'status',
@@ -798,3 +800,4 @@ public function managers(Request $request)
         ]);
     }
 }
+

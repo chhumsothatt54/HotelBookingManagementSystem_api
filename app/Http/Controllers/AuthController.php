@@ -54,6 +54,42 @@ class AuthController extends Controller
         ], 201);
     }
 
+    public function registerMg(Request $request)
+    {
+        $request->validate([
+            'name' => ['required', 'string', 'max:100'],
+            'email' => ['required', 'email', 'max:150', 'unique:users,email'],
+            'phone' => ['nullable', 'string', 'max:20'],
+            'password' => ['required', 'string', 'min:8', 'confirmed'],
+        ]);
+
+        $user = User::create([
+            'name' => $request->name,
+            'email' => $request->email,
+            'phone' => $request->phone,
+            'password' => Hash::make($request->password),
+            'role' => 'hotel_manager',
+            'status' => 'active',
+        ]);
+
+        $token = Str::random(64);
+
+        EmailVerification::create([
+            'user_id' => $user->id,
+            'token' => $token,
+            'expires_at' => Carbon::now()->addMinutes(30),
+        ]);
+
+        // Send Email
+        Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
+
+        return response()->json([
+            'message' => 'Hotel Manager register successful. Please verify your email.',
+            'user' => $user,
+            'verification_token' => $token,  // remove in production
+        ], 201);
+    }
+
     public function sendMail(Request $request)
     {
         $rawEmail = $request->input('email') ?? $request->query('email');
