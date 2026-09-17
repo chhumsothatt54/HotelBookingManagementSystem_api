@@ -122,81 +122,88 @@ class HotelManagerController extends Controller
 
 
     public function createHotel(Request $request)
-    {
-        $manager = $request->user();
+{
+    $manager = $request->user();
 
-        /*
-        |--------------------------------------------------------------------------
-        | One manager = One hotel
-        |--------------------------------------------------------------------------
-        */
+    // One manager = One hotel
+    $existingHotel = Hotel::where('manager_id', $manager->id)->first();
 
-        $existingHotel = Hotel::where('manager_id', $manager->id)->first();
-
-        if ($existingHotel) {
-            return response()->json([
-                'message' => 'You already have a hotel.'
-            ], 400);
-        }
-
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
-            'address' => 'required|string|max:255',
-            'city' => 'required|string|max:100',
-            'country' => 'required|string|max:100',
-            'province' => 'nullable|string|max:100',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
-        ]);
-
-        $validated['manager_id'] = $manager->id;
-
-        $hotel = Hotel::create($validated);
-
+    if ($existingHotel) {
         return response()->json([
-            'result' => true,
-            'message' => 'Hotel created successfully.',
-            'data' => $hotel
-        ], 201);
+            'message' => 'You already have a hotel.'
+        ], 400);
     }
+
+    $validated = $request->validate([
+        'name' => 'required|string|max:255',
+        'description' => 'nullable|string',
+        'phone' => 'nullable|string|max:50',
+
+        // ❌ REMOVE email from here
+
+        'address' => 'required|string|max:255',
+        'city' => 'required|string|max:100',
+        'country' => 'required|string|max:100',
+        'province' => 'nullable|string|max:100',
+        'latitude' => ['required', 'numeric', 'between:-90,90'],
+        'longitude' => ['required', 'numeric', 'between:-180,180'],
+    ]);
+
+    $validated['manager_id'] = $manager->id;
+
+    // ✅ Hotel email = Manager account email
+    $validated['email'] = $manager->email;
+
+    $hotel = Hotel::create($validated);
+
+    return response()->json([
+        'result' => true,
+        'message' => 'Hotel created successfully.',
+        'data' => $hotel
+    ], 201);
+}
 
 
     public function updateHotel(Request $request, $id)
-    {
-        $hotel = Hotel::where('id', $id)
-            ->where('manager_id', $request->user()->id)
-            ->first();
+{
+    $manager = $request->user();
 
-        if (!$hotel) {
-            return response()->json([
-                'message' => 'Hotel not found.'
-            ], 404);
-        }
+    $hotel = Hotel::where('id', $id)
+        ->where('manager_id', $manager->id)
+        ->first();
 
-        $validated = $request->validate([
-            'name' => 'sometimes|required|string|max:255',
-            'description' => 'nullable|string',
-            'phone' => 'nullable|string|max:50',
-            'email' => 'nullable|email|max:255',
-            'address' => 'sometimes|required|string|max:255',
-            'city' => 'sometimes|required|string|max:100',
-            'country' => 'sometimes|required|string|max:100',
-            'province' => 'nullable|string|max:100',
-            'latitude' => 'nullable|numeric',
-            'longitude' => 'nullable|numeric',
-        ]);
-
-        $hotel->update($validated);
-
+    if (!$hotel) {
         return response()->json([
-            'result' => true,
-            'message' => 'Hotel updated successfully.',
-            'data' => $hotel
-        ]);
+            'message' => 'Hotel not found.'
+        ], 404);
     }
+
+    $validated = $request->validate([
+        'name' => 'sometimes|required|string|max:255',
+        'description' => 'nullable|string',
+        'phone' => 'nullable|string|max:50',
+
+        // ❌ REMOVE email validation
+
+        'address' => 'sometimes|required|string|max:255',
+        'city' => 'sometimes|required|string|max:100',
+        'country' => 'sometimes|required|string|max:100',
+        'province' => 'nullable|string|max:100',
+        'latitude' => 'nullable|numeric|between:-90,90',
+        'longitude' => 'nullable|numeric|between:-180,180',
+    ]);
+
+    // ✅ Always sync hotel email with manager account email
+    $validated['email'] = $manager->email;
+
+    $hotel->update($validated);
+
+    return response()->json([
+        'result' => true,
+        'message' => 'Hotel updated successfully.',
+        'data' => $hotel
+    ]);
+}
 
     public function deleteHotel(Request $request, $id)
     {
@@ -1034,44 +1041,37 @@ public function deleteAmenity(Request $request, $id)
 
 
     /*
-    |--------------------------------------------------------------------------
-    | Revenue Report
-    |--------------------------------------------------------------------------
-    */
+|--------------------------------------------------------------------------
+| Revenue Report
+|--------------------------------------------------------------------------
+*/
 
-    public function revenueReport(Request $request)
-    {
-        $hotel = $this->managerHotel($request);
+public function revenueReport(Request $request)
+{
+    $hotel = $this->managerHotel($request);
 
-        /*
-        |--------------------------------------------------------------------------
-        | Group in PHP with Carbon instead of DB::raw('DATE(created_at)'),
-        | so this works the same on MySQL, Postgres, and SQLite (e.g. tests).
-        |--------------------------------------------------------------------------
-        */
+    $bookings = Booking::where('hotel_id', $hotel->id)
+        ->where('status', 'checked_out')
+        ->select('check_out', 'total_amount')
+        ->get();
 
-        $bookings = Booking::where('hotel_id', $hotel->id)
-            ->where('status', 'completed')
-            ->select('created_at', 'total_amount')
-            ->get();
+    $data = $bookings
+        ->groupBy(fn($booking) => Carbon::parse($booking->check_out)->toDateString())
+        ->map(fn($group, $date) => [
+            'date' => $date,
+            'revenue' => $group->sum('total_amount'),
+        ])
+        ->sortKeys()
+        ->values();
 
-        $data = $bookings
-            ->groupBy(fn($booking) => Carbon::parse($booking->created_at)->toDateString())
-            ->map(fn($group, $date) => [
-                'date' => $date,
-                'revenue' => $group->sum('total_amount'),
-            ])
-            ->sortKeys()
-            ->values();
-
-        return response()->json([
-            'result' => true,
-            'data' => [
-                'hotel' => $hotel->name,
-                'revenue' => $data
-            ]
-        ]);
-    }
+    return response()->json([
+        'result' => true,
+        'data' => [
+            'hotel' => $hotel->name,
+            'revenue' => $data
+        ]
+    ]);
+}
 
 
     /*
