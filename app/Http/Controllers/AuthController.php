@@ -13,6 +13,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
+use Laravel\Socialite\Facades\Socialite;
 use Exception;
 
 class AuthController extends Controller
@@ -138,7 +139,6 @@ class AuthController extends Controller
         return $this->sendMail($request);
     }
 
-
     public function confirmMail(Request $request)
     {
         $token = $request->query('token');
@@ -219,12 +219,59 @@ class AuthController extends Controller
         ]);
     }
 
+    /**
+     * Redirect to Google OAuth (បន្ថែម prompt=select_account ដើម្បីឱ្យចេញផ្ទាំងរើស Account ជានិច្ច)
+     */
+    public function redirectToGoogle()
+    {
+        return Socialite::driver('google')
+            ->stateless()
+            ->with(['prompt' => 'select_account'])
+            ->redirect();
+    }
+
+    /**
+     * Handle Google Callback
+     */
+    public function handleGoogleCallback()
+    {
+        try {
+            $googleUser = Socialite::driver('google')->stateless()->user();
+            
+            $user = User::where('email', $googleUser->getEmail())->first();
+
+            if ($user) {
+                $user->update([
+                    'name' => $googleUser->getName(),
+                    'google_id' => $googleUser->getId(),
+                    'email_verified_at' => $user->email_verified_at ?? now(),
+                    'status' => 'active',
+                ]);
+            } else {
+                $user = User::create([
+                    'name' => $googleUser->getName(),
+                    'email' => $googleUser->getEmail(),
+                    'google_id' => $googleUser->getId(),
+                    'password' => Hash::make(Str::random(16)),
+                    'email_verified_at' => now(),
+                    'status' => 'active',
+                    'role' => 'customer',
+                ]);
+            }
+
+            $token = $user->createToken('auth-token')->plainTextToken;
+
+            return redirect()->to('http://localhost:5173/login?token=' . $token);
+            
+        } catch (Exception $e) {
+            \Log::error('Google Login Error: ' . $e->getMessage());
+            return redirect()->to('http://localhost:5173/login?status=google_failed');
+        }
+    }
+
     public function logout(Request $request)
     {
-        $request
-            ->user()
-            ->currentAccessToken()
-            ->delete();
+        $request->user()->currentAccessToken()->delete();
 
         return response()->json([
             'message' => 'Logout successful',
@@ -386,93 +433,72 @@ class AuthController extends Controller
     }
 
     public function updateProfile(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $validated = $request->validate([
-        'name' => [
-            'required',
-            'string',
-            'min:1',
-            'max:100',
-        ],
+        $validated = $request->validate([
+            'name' => [
+                'required',
+                'string',
+                'min:1',
+                'max:100',
+            ],
+            'email' => [
+                'nullable',
+                'email',
+                'max:150',
+            ],
+            'phone' => [
+                'nullable',
+                'string',
+                'min:8',
+                'max:20',
+            ],
+            'avatar' => [
+                'nullable',
+                'file',
+                'mimes:jpg,jpeg,png,webp',
+                'max:2048',
+            ],
+        ]);
 
-        'email' => [
-            'nullable',
-            'email',
-            'max:150',
-        ],
+        if ($request->hasFile('avatar')) {
+            if (
+                $user->avatar &&
+                file_exists(public_path($user->avatar))
+            ) {
+                unlink(public_path($user->avatar));
+            }
 
-        'phone' => [
-            'nullable',
-            'string',
-            'min:8',
-            'max:20',
-        ],
+            $file = $request->file('avatar');
 
-        'avatar' => [
-            'nullable',
-            'file',
-            'mimes:jpg,jpeg,png,webp',
-            'max:2048',
-        ],
-    ]);
+            $fileName = time()
+                . '_'
+                . uniqid()
+                . '.'
+                . $file->getClientOriginalExtension();
 
-    /*
-    |--------------------------------------------------------------------------
-    | Upload Avatar
-    |--------------------------------------------------------------------------
-    */
+            $uploadPath = public_path('uploads/avatars');
 
-    if ($request->hasFile('avatar')) {
+            if (!file_exists($uploadPath)) {
+                mkdir($uploadPath, 0755, true);
+            }
 
-        // Delete old avatar
-        if (
-            $user->avatar &&
-            file_exists(public_path($user->avatar))
-        ) {
-            unlink(public_path($user->avatar));
+            $file->move(
+                $uploadPath,
+                $fileName
+            );
+
+            $validated['avatar'] = 'uploads/avatars/' . $fileName;
+        } else {
+            unset($validated['avatar']);
         }
 
-        $file = $request->file('avatar');
+        $user->update($validated);
 
-        $fileName = time()
-            . '_'
-            . uniqid()
-            . '.'
-            . $file->getClientOriginalExtension();
-
-        // Make sure directory exists
-        $uploadPath = public_path('uploads/avatars');
-
-        if (!file_exists($uploadPath)) {
-            mkdir($uploadPath, 0755, true);
-        }
-
-        // Move new avatar
-        $file->move(
-            $uploadPath,
-            $fileName
-        );
-
-        // Save relative path in database
-        $validated['avatar'] = 'uploads/avatars/' . $fileName;
-    } else {
-        unset($validated['avatar']);
+        return response()->json([
+            'message' => 'Profile updated successfully',
+            'user' => $user->fresh(),
+        ], 200);
     }
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update User
-    |--------------------------------------------------------------------------
-    */
-
-    $user->update($validated);
-
-    return response()->json([
-        'message' => 'Profile updated successfully',
-
-        'user' => $user->fresh(),
-    ], 200);
-}
 }
