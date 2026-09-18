@@ -71,7 +71,7 @@ class HotelManagerController extends Controller
             ->count();
 
         $revenue = Booking::where('hotel_id', $hotel->id)
-            ->where('status', 'completed')
+            ->where('status', 'confirmed')
             ->sum('total_amount');
 
         $averageRating = Review::where('hotel_id', $hotel->id)

@@ -779,7 +779,7 @@ public function managers(Request $request)
     {
         $notifications = UserNotification::with('user')
             ->latest()
-            ->paginate(10);
+            ->paginate(15);
 
         return response()->json([
             'message' => 'Notifications retrieved successfully',
