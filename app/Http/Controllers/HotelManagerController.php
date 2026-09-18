@@ -987,38 +987,79 @@ public function deleteAmenity(Request $request, $id)
 
 
     public function updateBookingStatus(Request $request, $id)
-    {
-        $hotel = $this->managerHotel($request);
+{
+    $hotel = $this->managerHotel($request);
 
-        $booking = Booking::where('hotel_id', $hotel->id)->findOrFail($id);
+    $booking = Booking::where('hotel_id', $hotel->id)->findOrFail($id);
 
-        $validated = $request->validate([
-            'status' => ['required', 'string', 'in:pending,confirmed,checked-in,checked-out,cancelled,rejected']
-        ]);
+    // Validate status
+    $validated = $request->validate([
+        'status' => [
+            'required',
+            'string',
+            'in:pending,confirmed,checked_in,checked_out,cancelled,rejected'
+        ]
+    ]);
 
-        $newStatus = $validated['status'];
-        $currentStatus = $booking->status;
+    $newStatus = $validated['status'];
+    $currentStatus = $booking->status;
 
-        $booking->update([
-            'status' => $newStatus
-        ]);
+    // Allowed status transitions
+    $allowedTransitions = [
+        'pending' => ['confirmed', 'rejected', 'cancelled'],
+        'confirmed' => ['checked_in', 'cancelled'],
+        'checked_in' => ['checked_out', 'cancelled'],
+        'checked_out' => [],
+        'rejected' => [],
+        'cancelled' => [],
+    ];
 
-        if (in_array($newStatus, ['checked-out', 'cancelled', 'rejected'], true) && $booking->room) {
-            $room = $booking->room;
+    // Check whether the transition is allowed
+    if (
+        isset($allowedTransitions[$currentStatus]) &&
+        !in_array($newStatus, $allowedTransitions[$currentStatus], true)
+    ) {
+        return response()->json([
+            'message' => "Cannot change booking status from {$currentStatus} to {$newStatus}."
+        ], 422);
+    }
 
-            if ($newStatus === 'cancelled' || $newStatus === 'rejected') {
-                $room->update(['status' => 'available']);
-            }
-            if ($newStatus === 'checked-out') {
-                $room->update(['status' => 'maintenance']);
-            }
+    // Update booking status
+    $booking->update([
+        'status' => $newStatus
+    ]);
+
+    // Update room status
+    if ($booking->room) {
+        $room = $booking->room;
+
+        // Cancelled or rejected → room becomes available
+        if (in_array($newStatus, ['cancelled', 'rejected'], true)) {
+            $room->update([
+                'status' => 'available'
+            ]);
         }
 
-        return response()->json([
-            'message' => 'Booking status updated successfully.',
-            'data' => $booking
-        ]);
+        // Checked in → room becomes occupied
+        if ($newStatus === 'checked_in') {
+            $room->update([
+                'status' => 'occupied'
+            ]);
+        }
+
+        // Checked out → room goes to maintenance
+        if ($newStatus === 'checked_out') {
+            $room->update([
+                'status' => 'maintenance'
+            ]);
+        }
     }
+
+    return response()->json([
+        'message' => 'Booking status updated successfully.',
+        'data' => $booking->fresh()
+    ]);
+}
 
 
     /*
