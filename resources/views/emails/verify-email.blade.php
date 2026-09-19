@@ -25,7 +25,7 @@
               </tr>
             </table>
 
-            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:22px; font-weight:bold; color:#063B32; margin:0 0 10px;">Confirm your email</h1>
+            <h1 style="font-family:Arial, Helvetica, sans-serif; font-size:22px; font-weight:bold; color:#063B32; margin:0 0 10px;">AngkorStay</h1>
 
             <p style="font-size:14px; line-height:1.6; color:#6B7772; margin:0 0 24px; font-family:Arial, Helvetica, sans-serif;">
               We sent a verification token to

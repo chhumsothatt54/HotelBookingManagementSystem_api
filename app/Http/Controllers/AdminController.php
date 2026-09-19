@@ -248,7 +248,7 @@ public function managers(Request $request)
     {
         $hotels = Hotel::with('manager')
             ->latest()
-            ->paginate(10);
+            ->get();
 
         return response()->json([
             'message' => 'Hotels retrieved successfully',

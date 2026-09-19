@@ -77,7 +77,7 @@ class CustomerController extends Controller
             $query->latest();
         }
 
-        return response()->json($query->paginate(12));
+        return response()->json($query->paginate($request->get('per_page', 100)));
     }
 
     /**
@@ -187,6 +187,7 @@ class CustomerController extends Controller
             'name' => $hotel->name,
             'description' => $hotel->description,
             'city' => $hotel->city,
+            'address' => $hotel->address,
             'rating' => (float) ($hotel->reviews_avg_rating ?? 0),
             'images' => $hotel->images,
             'room_types' => $hotel->roomTypes,
@@ -309,7 +310,7 @@ class CustomerController extends Controller
             'amount' => $request->amount,
             'payment_method' => $request->payment_method,  // ប្រើ 'aba', 'acleda', 'cash' ជាដើម
             'transaction_id' => $request->transaction_id,
-            'status' => 'paid',  // <-- ត្រូវប្រើ 'paid' មិនមែន 'completed' ទេ
+            'status' => 'pending',  // <-- ត្រូវប្រើ 'paid' មិនមែន 'completed' ទេ
             'paid_at' => now(),  // <-- បន្ថែមបន្ទាត់នេះដើម្បីសរសេរកាលបរិច្ឆេទ/ម៉ោងបច្ចុប្បន្ន
         ]);
 
