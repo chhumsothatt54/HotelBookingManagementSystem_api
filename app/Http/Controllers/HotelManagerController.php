@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Amenity;
+use App\Models\User;
+use App\Models\UserNotification;
 use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\HotelImage;
