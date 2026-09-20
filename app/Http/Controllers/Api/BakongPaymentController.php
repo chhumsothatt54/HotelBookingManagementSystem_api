@@ -49,8 +49,7 @@ class BakongPaymentController extends Controller
                 amount: (float) $booking->total_amount,
                 billNumber: $booking->booking_number,
                 storeLabel: $safeMerchantName,
-                terminalLabel: 'Counter 01',
-                expirationTimestamp: strval((int) (microtime(true) * 1000) + 10 * 60 * 1000),
+                terminalLabel: 'Counter 01'
             );
 
             $result = BakongKHQR::generateIndividual($individualInfo);

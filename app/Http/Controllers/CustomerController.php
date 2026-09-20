@@ -260,6 +260,20 @@ class CustomerController extends Controller
 
         $checkIn = Carbon::parse($validated['check_in']);
         $checkOut = Carbon::parse($validated['check_out']);
+
+        // Check for overlapping bookings
+        $isBooked = Booking::where('room_id', $validated['room_id'])
+            ->whereIn('status', ['pending', 'approved', 'confirmed'])
+            ->where('check_in', '<', $checkOut)
+            ->where('check_out', '>', $checkIn)
+            ->exists();
+
+        if ($isBooked) {
+            return response()->json([
+                'message' => 'The selected room is already booked for these dates.'
+            ], 422);
+        }
+
         $nights = $checkIn->diffInDays($checkOut);
 
         $pricePerNight = $room->roomType->price_per_night ?? $room->price_per_night;
@@ -308,13 +322,13 @@ class CustomerController extends Controller
         $payment = Payment::create([
             'booking_id' => $booking->id,
             'amount' => $request->amount,
-            'payment_method' => $request->payment_method,  // ប្រើ 'aba', 'acleda', 'cash' ជាដើម
+            'payment_method' => $request->payment_method, 
             'transaction_id' => $request->transaction_id,
-            'status' => 'pending',  // <-- ត្រូវប្រើ 'paid' មិនមែន 'completed' ទេ
-            'paid_at' => now(),  // <-- បន្ថែមបន្ទាត់នេះដើម្បីសរសេរកាលបរិច្ឆេទ/ម៉ោងបច្ចុប្បន្ន
+            'status' => 'pending',  
+            'paid_at' => now(), 
         ]);
 
-        $booking->update(['status' => 'confirmed']);
+        $booking->update(['status' => 'pending']);
 
         return response()->json([
             'message' => 'Payment processed successfully.',
@@ -354,7 +368,7 @@ class CustomerController extends Controller
     public function bookingHistory(Request $request)
     {
         $bookings = Booking::where('customer_id', $request->user()->id)
-            ->with(['hotel', 'room.roomType'])
+            ->with(['hotel', 'room.roomType', 'payments'])
             ->latest()
             ->paginate(10);
 
