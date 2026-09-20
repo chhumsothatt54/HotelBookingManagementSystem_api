@@ -151,6 +151,17 @@ class HotelManagerController extends Controller
 
         $hotel = Hotel::create($validated);
 
+        // ✅ Notify the admin about the new hotel (assuming only 1 admin)
+        $admin = User::where('role', 'admin')->first();
+        if ($admin) {
+            UserNotification::create([
+                'user_id' => $admin->id,
+                'title' => 'New Hotel Created',
+                'message' => 'Manager ' . $manager->name . ' has created a new hotel: ' . $hotel->name,
+                'type' => 'hotel_created',
+            ]);
+        }
+
         return response()->json([
             'result' => true,
             'message' => 'Hotel created successfully.',
