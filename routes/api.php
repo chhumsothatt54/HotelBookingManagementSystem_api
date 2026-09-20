@@ -227,6 +227,14 @@ Route::middleware([
         AdminController::class,
         'notifications'
     ]);
+    Route::patch('/notifications/read-all', [
+        AdminController::class,
+        'readAllNotifications'
+    ]);
+    Route::patch('/notifications/{id}/read', [
+        AdminController::class,
+        'readNotification'
+    ]);
 
     Route::get('/audit-logs', [
         AdminController::class,

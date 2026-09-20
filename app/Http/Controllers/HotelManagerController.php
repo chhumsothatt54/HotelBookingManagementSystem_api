@@ -2,14 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\RoomImage;
 use App\Models\Amenity;
 use App\Models\Booking;
 use App\Models\Hotel;
 use App\Models\HotelImage;
 use App\Models\Review;
 use App\Models\Room;
+use App\Models\RoomImage;
 use App\Models\RoomType;
+use App\Models\User;
+use App\Models\UserNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -17,10 +19,10 @@ use Illuminate\Support\Facades\Storage;
 class HotelManagerController extends Controller
 {
     /*
-    |--------------------------------------------------------------------------
-    | Shared helpers
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Shared helpers
+     * |--------------------------------------------------------------------------
+     */
 
     /**
      * Resolve the authenticated manager's hotel or abort with a 404 that
@@ -45,10 +47,10 @@ class HotelManagerController extends Controller
     ];
 
     /*
-    |--------------------------------------------------------------------------
-    | Dashboard
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Dashboard
+     * |--------------------------------------------------------------------------
+     */
 
     public function dashboard(Request $request)
     {
@@ -92,12 +94,11 @@ class HotelManagerController extends Controller
         ]);
     }
 
-
     /*
-    |--------------------------------------------------------------------------
-    | Hotel
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Hotel
+     * |--------------------------------------------------------------------------
+     */
 
     public function myHotel(Request $request)
     {
@@ -105,7 +106,6 @@ class HotelManagerController extends Controller
             ->with([
                 'roomTypes',
                 'rooms.amenities',
-
             ])
             ->first();
 
@@ -120,90 +120,94 @@ class HotelManagerController extends Controller
         ]);
     }
 
-
     public function createHotel(Request $request)
-{
-    $manager = $request->user();
+    {
+        $manager = $request->user();
 
-    // One manager = One hotel
-    $existingHotel = Hotel::where('manager_id', $manager->id)->first();
+        // One manager = One hotel
+        $existingHotel = Hotel::where('manager_id', $manager->id)->first();
 
-    if ($existingHotel) {
+        if ($existingHotel) {
+            return response()->json([
+                'message' => 'You already have a hotel.'
+            ], 400);
+        }
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'phone' => 'nullable|string|max:50',
+            // ❌ REMOVE email from here
+            'address' => 'required|string|max:255',
+            'city' => 'required|string|max:100',
+            'country' => 'required|string|max:100',
+            'province' => 'nullable|string|max:100',
+            'latitude' => ['required', 'numeric', 'between:-90,90'],
+            'longitude' => ['required', 'numeric', 'between:-180,180'],
+        ]);
+
+        $validated['manager_id'] = $manager->id;
+
+        $validated['email'] = $manager->email;
+
+        $hotel = Hotel::create($validated);
+
+        // ✅ Notify the admin about the new hotel (assuming only 1 admin)
+        $admin = User::where('role', 'admin')->first();
+        if ($admin) {
+            UserNotification::create([
+                'user_id' => $admin->id,
+                'title' => 'New Hotel Created',
+                'message' => 'Manager ' . $manager->name . ' has created a new hotel: ' . $hotel->name,
+                'type' => 'hotel_created',
+            ]);
+        }
+
         return response()->json([
-            'message' => 'You already have a hotel.'
-        ], 400);
+            'result' => true,
+            'message' => 'Hotel created successfully.',
+            'data' => $hotel
+        ], 201);
     }
-
-    $validated = $request->validate([
-        'name' => 'required|string|max:255',
-        'description' => 'nullable|string',
-        'phone' => 'nullable|string|max:50',
-
-        // ❌ REMOVE email from here
-
-        'address' => 'required|string|max:255',
-        'city' => 'required|string|max:100',
-        'country' => 'required|string|max:100',
-        'province' => 'nullable|string|max:100',
-        'latitude' => ['required', 'numeric', 'between:-90,90'],
-        'longitude' => ['required', 'numeric', 'between:-180,180'],
-    ]);
-
-    $validated['manager_id'] = $manager->id;
-
-    // ✅ Hotel email = Manager account email
-    $validated['email'] = $manager->email;
-
-    $hotel = Hotel::create($validated);
-
-    return response()->json([
-        'result' => true,
-        'message' => 'Hotel created successfully.',
-        'data' => $hotel
-    ], 201);
-}
-
 
     public function updateHotel(Request $request, $id)
-{
-    $manager = $request->user();
+    {
+        $manager = $request->user();
 
-    $hotel = Hotel::where('id', $id)
-        ->where('manager_id', $manager->id)
-        ->first();
+        $hotel = Hotel::where('id', $id)
+            ->where('manager_id', $manager->id)
+            ->first();
 
-    if (!$hotel) {
+        if (!$hotel) {
+            return response()->json([
+                'message' => 'Hotel not found.'
+            ], 404);
+        }
+
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'phone' => 'nullable|string|max:50',
+            // ❌ REMOVE email validation
+            'address' => 'sometimes|required|string|max:255',
+            'city' => 'sometimes|required|string|max:100',
+            'country' => 'sometimes|required|string|max:100',
+            'province' => 'nullable|string|max:100',
+            'latitude' => 'nullable|numeric|between:-90,90',
+            'longitude' => 'nullable|numeric|between:-180,180',
+        ]);
+
+        // ✅ Always sync hotel email with manager account email
+        $validated['email'] = $manager->email;
+
+        $hotel->update($validated);
+
         return response()->json([
-            'message' => 'Hotel not found.'
-        ], 404);
+            'result' => true,
+            'message' => 'Hotel updated successfully.',
+            'data' => $hotel
+        ]);
     }
-
-    $validated = $request->validate([
-        'name' => 'sometimes|required|string|max:255',
-        'description' => 'nullable|string',
-        'phone' => 'nullable|string|max:50',
-
-        // ❌ REMOVE email validation
-
-        'address' => 'sometimes|required|string|max:255',
-        'city' => 'sometimes|required|string|max:100',
-        'country' => 'sometimes|required|string|max:100',
-        'province' => 'nullable|string|max:100',
-        'latitude' => 'nullable|numeric|between:-90,90',
-        'longitude' => 'nullable|numeric|between:-180,180',
-    ]);
-
-    // ✅ Always sync hotel email with manager account email
-    $validated['email'] = $manager->email;
-
-    $hotel->update($validated);
-
-    return response()->json([
-        'result' => true,
-        'message' => 'Hotel updated successfully.',
-        'data' => $hotel
-    ]);
-}
 
     public function deleteHotel(Request $request, $id)
     {
@@ -227,7 +231,7 @@ class HotelManagerController extends Controller
             ], 409);
         }
 
-        // We can assume cascade delete is set on DB level for relations like rooms, room_types, hotel_images, etc. 
+        // We can assume cascade delete is set on DB level for relations like rooms, room_types, hotel_images, etc.
         // If not, we might need to delete them explicitly. But it's usually better handled by migrations.
         $hotel->delete();
 
@@ -236,7 +240,6 @@ class HotelManagerController extends Controller
             'message' => 'Hotel deleted successfully.'
         ]);
     }
-
 
     public function hotelImages(Request $request)
     {
@@ -260,45 +263,44 @@ class HotelManagerController extends Controller
             'data' => $images,
         ]);
     }
+
     public function updateProfile(Request $request)
-{
-    $user = $request->user();
+    {
+        $user = $request->user();
 
-    $request->validate([
-        'name' => 'required|string|max:255',
-        'email' => 'nullable|email|max:255',
-        'phone' => 'nullable|string|max:30',
-        'avatar' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
-    ]);
+        $request->validate([
+            'name' => 'required|string|max:255',
+            'email' => 'nullable|email|max:255',
+            'phone' => 'nullable|string|max:30',
+            'avatar' => 'nullable|file|mimes:jpg,jpeg,png,webp|max:2048',
+        ]);
 
-    $user->name = $request->name;
-    $user->email = $request->email;
-    $user->phone = $request->phone;
+        $user->name = $request->name;
+        $user->email = $request->email;
+        $user->phone = $request->phone;
 
-    if ($request->hasFile('avatar')) {
+        if ($request->hasFile('avatar')) {
+            // Delete old avatar
+            if ($user->avatar) {
+                Storage::disk('public')->delete($user->avatar);
+            }
 
-        // Delete old avatar
-        if ($user->avatar) {
-            Storage::disk('public')->delete($user->avatar);
+            // Save new avatar
+            $path = $request->file('avatar')->store(
+                'avatars',
+                'public'
+            );
+
+            $user->avatar = $path;
         }
 
-        // Save new avatar
-        $path = $request->file('avatar')->store(
-            'avatars',
-            'public'
-        );
+        $user->save();
 
-        $user->avatar = $path;
+        return response()->json([
+            'message' => 'Profile updated successfully.',
+            'user' => $user,
+        ]);
     }
-
-    $user->save();
-
-    return response()->json([
-        'message' => 'Profile updated successfully.',
-        'user' => $user,
-    ]);
-}
-
 
     public function uploadImage(Request $request)
     {
@@ -342,8 +344,6 @@ class HotelManagerController extends Controller
         ], 201);
     }
 
-
-
     public function deleteImage(Request $request, $id)
     {
         $hotel = $this->managerHotel($request);
@@ -372,12 +372,11 @@ class HotelManagerController extends Controller
         ]);
     }
 
-
     /*
-    |--------------------------------------------------------------------------
-    | Room Types
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Room Types
+     * |--------------------------------------------------------------------------
+     */
 
     public function roomTypes(Request $request)
     {
@@ -393,117 +392,114 @@ class HotelManagerController extends Controller
         ]);
     }
 
-
     public function storeRoomType(Request $request)
-{
-    $hotel = $this->managerHotel($request);
+    {
+        $hotel = $this->managerHotel($request);
 
-    $validated = $request->validate([
-        'name'            => 'required|string|max:255',
-        'description'     => 'nullable|string',
-        'max_guests'      => 'required|integer|min:1',       // កែពី capacity -> max_guests
-        'price_per_night' => 'required|numeric|min:0',       // កែពី price -> price_per_night
-        'status'          => 'nullable|string',
-    ]);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string',
+            'max_guests' => 'required|integer|min:1',  // កែពី capacity -> max_guests
+            'price_per_night' => 'required|numeric|min:0',  // កែពី price -> price_per_night
+            'status' => 'nullable|string',
+        ]);
 
-    $validated['hotel_id'] = $hotel->id;
+        $validated['hotel_id'] = $hotel->id;
 
-    $roomType = RoomType::create($validated);
+        $roomType = RoomType::create($validated);
 
-    return response()->json([
-        'result'  => true,
-        'message' => 'Room type created successfully.',
-        'data'    => $roomType
-    ], 201);
-}
-
-public function updateRoomType(Request $request, $id)
-{
-    $hotel = $this->managerHotel($request);
-
-    $roomType = RoomType::where('id', $id)
-        ->where('hotel_id', $hotel->id)
-        ->first();
-
-    if (!$roomType) {
         return response()->json([
-            'message' => 'Room type not found.'
-        ], 404);
+            'result' => true,
+            'message' => 'Room type created successfully.',
+            'data' => $roomType
+        ], 201);
     }
 
-    $validated = $request->validate([
-        'name'            => 'sometimes|required|string|max:255',
-        'description'     => 'nullable|string',
-        'max_guests'      => 'sometimes|required|integer|min:1',
-        'price_per_night' => 'sometimes|required|numeric|min:0',
-        'status'          => 'sometimes|nullable|string',
-    ]);
+    public function updateRoomType(Request $request, $id)
+    {
+        $hotel = $this->managerHotel($request);
 
-    $roomType->update($validated);
+        $roomType = RoomType::where('id', $id)
+            ->where('hotel_id', $hotel->id)
+            ->first();
 
-    return response()->json([
-        'result'  => true,
-        'message' => 'Room type updated successfully.',
-        'data'    => $roomType
-    ]);
-}
+        if (!$roomType) {
+            return response()->json([
+                'message' => 'Room type not found.'
+            ], 404);
+        }
 
+        $validated = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'description' => 'nullable|string',
+            'max_guests' => 'sometimes|required|integer|min:1',
+            'price_per_night' => 'sometimes|required|numeric|min:0',
+            'status' => 'sometimes|nullable|string',
+        ]);
+
+        $roomType->update($validated);
+
+        return response()->json([
+            'result' => true,
+            'message' => 'Room type updated successfully.',
+            'data' => $roomType
+        ]);
+    }
 
     public function deleteRoomType(Request $request, $id)
-{
-    $hotel = $this->managerHotel($request);
+    {
+        $hotel = $this->managerHotel($request);
 
-    // លុប dd(...) ចេញ
+        // លុប dd(...) ចេញ
 
-    $roomType = RoomType::where('id', $id)
-        ->where('hotel_id', $hotel->id)
-        ->first();
+        $roomType = RoomType::where('id', $id)
+            ->where('hotel_id', $hotel->id)
+            ->first();
 
-    if (!$roomType) {
+        if (!$roomType) {
+            return response()->json([
+                'message' => 'Room type not found.'
+            ], 404);
+        }
+
+        // ពិនិត្យមើលថាតើមានការកក់ (Booking) សកម្មដែរឬទេ
+        $hasBookings = Booking::whereHas('room', function ($query) use ($roomType) {
+            $query->where('room_type_id', $roomType->id);
+        })
+            ->whereIn('status', ['pending', 'approved'])
+            ->exists();
+
+        if ($hasBookings) {
+            return response()->json([
+                'message' => 'Cannot delete this room type because it has active bookings.'
+            ], 422);
+        }
+
+        // លុបបន្ទប់ទាំងឡាយណាដែលស្ថិតនៅក្នុង Room Type នេះ
+        Room::where('room_type_id', $roomType->id)
+            ->where('hotel_id', $hotel->id)
+            ->delete();
+
+        $roomType->delete();
+
         return response()->json([
-            'message' => 'Room type not found.'
-        ], 404);
+            'result' => true,
+            'message' => 'Room type deleted successfully.'
+        ]);
     }
-
-    // ពិនិត្យមើលថាតើមានការកក់ (Booking) សកម្មដែរឬទេ
-    $hasBookings = Booking::whereHas('room', function ($query) use ($roomType) {
-        $query->where('room_type_id', $roomType->id);
-    })
-        ->whereIn('status', ['pending', 'approved'])
-        ->exists();
-
-    if ($hasBookings) {
-        return response()->json([
-            'message' => 'Cannot delete this room type because it has active bookings.'
-        ], 422);
-    }
-
-    // លុបបន្ទប់ទាំងឡាយណាដែលស្ថិតនៅក្នុង Room Type នេះ
-    Room::where('room_type_id', $roomType->id)
-        ->where('hotel_id', $hotel->id)
-        ->delete();
-
-    $roomType->delete();
-
-    return response()->json([
-        'result' => true,
-        'message' => 'Room type deleted successfully.'
-    ]);
-}
-
 
     /*
-    |--------------------------------------------------------------------------
-    | Rooms
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Rooms
+     * |--------------------------------------------------------------------------
+     */
 
     public function rooms(Request $request)
     {
         $hotel = $this->managerHotel($request);
 
         $rooms = Room::where('hotel_id', $hotel->id)
-            ->with('roomType' , 'amenities')
+            ->with('roomType', 'amenities')
             ->paginate(15);
 
         return response()->json([
@@ -511,7 +507,6 @@ public function updateRoomType(Request $request, $id)
             'data' => $rooms
         ]);
     }
-
 
     public function storeRoom(Request $request)
     {
@@ -525,10 +520,10 @@ public function updateRoomType(Request $request, $id)
         ]);
 
         /*
-        |--------------------------------------------------------------------------
-        | Make sure room type belongs to manager's hotel
-        |--------------------------------------------------------------------------
-        */
+         * |--------------------------------------------------------------------------
+         * | Make sure room type belongs to manager's hotel
+         * |--------------------------------------------------------------------------
+         */
 
         $roomType = RoomType::where('id', $validated['room_type_id'])
             ->where('hotel_id', $hotel->id)
@@ -551,7 +546,6 @@ public function updateRoomType(Request $request, $id)
         ], 201);
     }
 
-
     public function updateRoom(Request $request, $id)
     {
         $hotel = $this->managerHotel($request);
@@ -571,14 +565,13 @@ public function updateRoomType(Request $request, $id)
             'room_number' => 'sometimes|required|string|max:50',
             'floor' => 'nullable|integer',
             'status' => 'sometimes|required|in:available,maintenance,inactive',
-
         ]);
 
         /*
-        |--------------------------------------------------------------------------
-        | Check updated room type belongs to this hotel
-        |--------------------------------------------------------------------------
-        */
+         * |--------------------------------------------------------------------------
+         * | Check updated room type belongs to this hotel
+         * |--------------------------------------------------------------------------
+         */
 
         if (isset($validated['room_type_id'])) {
             $roomType = RoomType::where('id', $validated['room_type_id'])
@@ -601,7 +594,6 @@ public function updateRoomType(Request $request, $id)
         ]);
     }
 
-
     public function deleteRoom(Request $request, $id)
     {
         $hotel = $this->managerHotel($request);
@@ -617,11 +609,11 @@ public function updateRoomType(Request $request, $id)
         }
 
         /*
-        |--------------------------------------------------------------------------
-        | Guard: block deletion while bookings against this specific room are
-        | still active, so we never orphan a booking's room.
-        |--------------------------------------------------------------------------
-        */
+         * |--------------------------------------------------------------------------
+         * | Guard: block deletion while bookings against this specific room are
+         * | still active, so we never orphan a booking's room.
+         * |--------------------------------------------------------------------------
+         */
 
         $hasActiveBookings = Booking::where('room_id', $room->id)
             ->whereIn('status', ['pending', 'approved'])
@@ -683,7 +675,6 @@ public function updateRoomType(Request $request, $id)
         $images = [];
 
         foreach ($request->file('images') as $file) {
-
             $path = $file->store('room-images', 'public');
 
             $image = RoomImage::create([
@@ -727,114 +718,112 @@ public function updateRoomType(Request $request, $id)
         ]);
     }
 
-    //store amenity
+    // store amenity
     public function storeAmenity(Request $request)
-{
-    $validated = $request->validate([
-        'name' => 'required|string|max:255|unique:amenities,name',
-        'icon' => 'nullable|string|max:255',
-        'description' => 'nullable|string',
-        'status' => 'nullable|string|max:50',
-    ]);
+    {
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:amenities,name',
+            'icon' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'status' => 'nullable|string|max:50',
+        ]);
 
-    $amenity = Amenity::create([
-        'name' => $validated['name'],
-        'icon' => $validated['icon'] ?? null,
-        'description' => $validated['description'] ?? null,
-        'status' => $validated['status'] ?? 'active',
-    ]);
+        $amenity = Amenity::create([
+            'name' => $validated['name'],
+            'icon' => $validated['icon'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'] ?? 'active',
+        ]);
 
-    return response()->json([
-        'result' => true,
-        'message' => 'Amenity created successfully.',
-        'data' => $amenity,
-    ], 201);
-}
-
-//updaste 
-
-public function updateAmenity(Request $request, $id)
-{
-    $amenity = Amenity::find($id);
-
-    if (!$amenity) {
         return response()->json([
-            'result' => false,
-            'message' => 'Amenity not found.'
-        ], 404);
+            'result' => true,
+            'message' => 'Amenity created successfully.',
+            'data' => $amenity,
+        ], 201);
     }
 
-    $validated = $request->validate([
-        'name' => 'required|string|max:255|unique:amenities,name,' . $amenity->id,
-        'icon' => 'nullable|string|max:255',
-        'description' => 'nullable|string',
-        'status' => 'nullable|string|max:50',
-    ]);
+    // updaste
 
-    $amenity->update([
-        'name' => $validated['name'],
-        'icon' => $validated['icon'] ?? null,
-        'description' => $validated['description'] ?? null,
-        'status' => $validated['status'] ?? $amenity->status,
-    ]);
+    public function updateAmenity(Request $request, $id)
+    {
+        $amenity = Amenity::find($id);
 
-    return response()->json([
-        'result' => true,
-        'message' => 'Amenity updated successfully.',
-        'data' => $amenity,
-    ]);
-}
+        if (!$amenity) {
+            return response()->json([
+                'result' => false,
+                'message' => 'Amenity not found.'
+            ], 404);
+        }
 
-// delete amenity
-public function deleteAmenity(Request $request, $id)
-{
-    $amenity = Amenity::find($id);
+        $validated = $request->validate([
+            'name' => 'required|string|max:255|unique:amenities,name,' . $amenity->id,
+            'icon' => 'nullable|string|max:255',
+            'description' => 'nullable|string',
+            'status' => 'nullable|string|max:50',
+        ]);
 
-    if (!$amenity) {
+        $amenity->update([
+            'name' => $validated['name'],
+            'icon' => $validated['icon'] ?? null,
+            'description' => $validated['description'] ?? null,
+            'status' => $validated['status'] ?? $amenity->status,
+        ]);
+
         return response()->json([
-            'result' => false,
-            'message' => 'Amenity not found.'
-        ], 404);
+            'result' => true,
+            'message' => 'Amenity updated successfully.',
+            'data' => $amenity,
+        ]);
     }
 
-    $amenity->delete();
+    // delete amenity
+    public function deleteAmenity(Request $request, $id)
+    {
+        $amenity = Amenity::find($id);
 
-    return response()->json([
-        'result' => true,
-        'message' => 'Amenity deleted successfully.',
-    ]);
-}
+        if (!$amenity) {
+            return response()->json([
+                'result' => false,
+                'message' => 'Amenity not found.'
+            ], 404);
+        }
 
+        $amenity->delete();
+
+        return response()->json([
+            'result' => true,
+            'message' => 'Amenity deleted successfully.',
+        ]);
+    }
 
     public function amenities(Request $request)
-{
-    $hotel = $this->managerHotel($request);
+    {
+        $hotel = $this->managerHotel($request);
 
-    $rooms = Room::where('hotel_id', $hotel->id)
-        ->with('amenities')
-        ->paginate(15);
+        $rooms = Room::where('hotel_id', $hotel->id)
+            ->with('amenities')
+            ->paginate(15);
 
-    $amenities = Amenity::orderBy('name')->get();
+        $amenities = Amenity::orderBy('name')->get();
 
-    return response()->json([
-        'result' => true,
-        'data' => [
-            'rooms' => $rooms,
-            'amenities' => $amenities,
-        ]
-    ]);
-}
-
+        return response()->json([
+            'result' => true,
+            'data' => [
+                'rooms' => $rooms,
+                'amenities' => $amenities,
+            ]
+        ]);
+    }
 
     public function attachAmenity(Request $request, $roomId, $amenityId)
     {
         $hotel = $this->managerHotel($request);
 
         /*
-    |--------------------------------------------------------------------------
-    | Make sure the room belongs to this manager's hotel
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Make sure the room belongs to this manager's hotel
+         * |--------------------------------------------------------------------------
+         */
 
         $room = Room::where('id', $roomId)
             ->where('hotel_id', $hotel->id)
@@ -848,10 +837,10 @@ public function deleteAmenity(Request $request, $id)
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Make sure the amenity exists
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Make sure the amenity exists
+         * |--------------------------------------------------------------------------
+         */
 
         $amenity = Amenity::find($amenityId);
 
@@ -862,10 +851,10 @@ public function deleteAmenity(Request $request, $id)
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Attach amenity to room
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Attach amenity to room
+         * |--------------------------------------------------------------------------
+         */
 
         $room->amenities()->syncWithoutDetaching([
             $amenity->id
@@ -881,16 +870,15 @@ public function deleteAmenity(Request $request, $id)
         ]);
     }
 
-
     public function detachAmenity(Request $request, $roomId, $amenityId)
     {
         $hotel = $this->managerHotel($request);
 
         /*
-    |--------------------------------------------------------------------------
-    | Make sure the room belongs to this manager's hotel
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Make sure the room belongs to this manager's hotel
+         * |--------------------------------------------------------------------------
+         */
 
         $room = Room::where('id', $roomId)
             ->where('hotel_id', $hotel->id)
@@ -904,10 +892,10 @@ public function deleteAmenity(Request $request, $id)
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Make sure the amenity exists
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Make sure the amenity exists
+         * |--------------------------------------------------------------------------
+         */
 
         $amenity = Amenity::find($amenityId);
 
@@ -918,10 +906,10 @@ public function deleteAmenity(Request $request, $id)
         }
 
         /*
-    |--------------------------------------------------------------------------
-    | Detach amenity from room
-    |--------------------------------------------------------------------------
-    */
+         * |--------------------------------------------------------------------------
+         * | Detach amenity from room
+         * |--------------------------------------------------------------------------
+         */
 
         $room->amenities()->detach($amenity->id);
 
@@ -935,14 +923,11 @@ public function deleteAmenity(Request $request, $id)
         ]);
     }
 
-
-
-
     /*
-    |--------------------------------------------------------------------------
-    | Bookings
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Bookings
+     * |--------------------------------------------------------------------------
+     */
 
     public function bookings(Request $request)
     {
@@ -959,7 +944,6 @@ public function deleteAmenity(Request $request, $id)
 
         return response()->json($bookings);
     }
-
 
     public function showBooking(Request $request, $id)
     {
@@ -986,105 +970,99 @@ public function deleteAmenity(Request $request, $id)
         ]);
     }
 
+    public function updateBookingStatus(Request $request, $id)
+    {
+        $hotel = $this->managerHotel($request);
 
+        $booking = Booking::where('hotel_id', $hotel->id)
+            ->with('room')
+            ->findOrFail($id);
 
-public function updateBookingStatus(Request $request, $id)
-{
-    $hotel = $this->managerHotel($request);
+        $validated = $request->validate([
+            'status' => [
+                'required',
+                'string',
+                'in:pending,confirmed,checked_in,checked_out,cancelled,rejected'
+            ],
+        ]);
 
-    $booking = Booking::where('hotel_id', $hotel->id)
-        ->with('room')
-        ->findOrFail($id);
+        $newStatus = $validated['status'];
+        $currentStatus = $booking->status;
 
-    $validated = $request->validate([
-        'status' => [
-            'required',
-            'string',
-            'in:pending,confirmed,checked_in,checked_out,cancelled,rejected'
-        ],
-    ]);
+        /*
+         * |--------------------------------------------------------------------------
+         * | Allowed Status Transitions
+         * |--------------------------------------------------------------------------
+         */
 
-    $newStatus = $validated['status'];
-    $currentStatus = $booking->status;
+        $allowedTransitions = [
+            'pending' => ['confirmed', 'cancelled', 'rejected'],
+            'confirmed' => ['checked_in', 'cancelled'],
+            'checked_in' => ['checked_out', 'cancelled'],
+            'checked_out' => [],
+            'cancelled' => [],
+            'rejected' => [],
+        ];
 
-    /*
-    |--------------------------------------------------------------------------
-    | Allowed Status Transitions
-    |--------------------------------------------------------------------------
-    */
+        if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [], true)) {
+            return response()->json([
+                'message' => "Cannot change booking status from {$currentStatus} to {$newStatus}."
+            ], 422);
+        }
 
-    $allowedTransitions = [
-        'pending' => ['confirmed', 'cancelled', 'rejected'],
-        'confirmed' => ['checked_in', 'cancelled'],
-        'checked_in' => ['checked_out', 'cancelled'],
-        'checked_out' => [],
-        'cancelled' => [],
-        'rejected' => [],
-    ];
+        /*
+         * |--------------------------------------------------------------------------
+         * | Update Booking
+         * |--------------------------------------------------------------------------
+         */
 
-    if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [], true)) {
+        $booking->update([
+            'status' => $newStatus,
+        ]);
+
+        /*
+         * |--------------------------------------------------------------------------
+         * | Update Room Status
+         * |--------------------------------------------------------------------------
+         * |
+         * | checked_in  → room inactive
+         * | checked_out → room maintenance
+         * | cancelled/rejected → room available
+         * |
+         */
+
+        if ($booking->room) {
+            if ($newStatus === 'checked_in') {
+                $booking->room->update([
+                    'status' => 'inactive',
+                ]);
+            }
+
+            if ($newStatus === 'checked_out') {
+                $booking->room->update([
+                    'status' => 'maintenance',
+                ]);
+            }
+
+            if (in_array($newStatus, ['cancelled', 'rejected'], true)) {
+                $booking->room->update([
+                    'status' => 'available',
+                ]);
+            }
+        }
+
         return response()->json([
-            'message' => "Cannot change booking status from {$currentStatus} to {$newStatus}."
-        ], 422);
+            'result' => true,
+            'message' => 'Booking status updated successfully.',
+            'data' => $booking->fresh('room'),
+        ]);
     }
 
     /*
-    |--------------------------------------------------------------------------
-    | Update Booking
-    |--------------------------------------------------------------------------
-    */
-
-    $booking->update([
-        'status' => $newStatus,
-    ]);
-
-    /*
-    |--------------------------------------------------------------------------
-    | Update Room Status
-    |--------------------------------------------------------------------------
-    |
-    | checked_in  → room inactive
-    | checked_out → room maintenance
-    | cancelled/rejected → room available
-    |
-    */
-
-    if ($booking->room) {
-
-        if ($newStatus === 'checked_in') {
-            $booking->room->update([
-                'status' => 'inactive',
-            ]);
-        }
-
-        if ($newStatus === 'checked_out') {
-            $booking->room->update([
-                'status' => 'maintenance',
-            ]);
-        }
-
-        if (in_array($newStatus, ['cancelled', 'rejected'], true)) {
-            $booking->room->update([
-                'status' => 'available',
-            ]);
-        }
-    }
-
-    return response()->json([
-        'result' => true,
-        'message' => 'Booking status updated successfully.',
-        'data' => $booking->fresh('room'),
-    ]);
-}
-
-
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Reviews
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Reviews
+     * |--------------------------------------------------------------------------
+     */
 
     public function reviews(Request $request)
     {
@@ -1098,46 +1076,44 @@ public function updateBookingStatus(Request $request, $id)
         return response()->json($reviews);
     }
 
+    /*
+     * |--------------------------------------------------------------------------
+     * | Revenue Report
+     * |--------------------------------------------------------------------------
+     */
+
+    public function revenueReport(Request $request)
+    {
+        $hotel = $this->managerHotel($request);
+
+        $bookings = Booking::where('hotel_id', $hotel->id)
+            ->where('status', 'checked_out')
+            ->select('check_out', 'total_amount')
+            ->get();
+
+        $data = $bookings
+            ->groupBy(fn($booking) => Carbon::parse($booking->check_out)->toDateString())
+            ->map(fn($group, $date) => [
+                'date' => $date,
+                'revenue' => $group->sum('total_amount'),
+            ])
+            ->sortKeys()
+            ->values();
+
+        return response()->json([
+            'result' => true,
+            'data' => [
+                'hotel' => $hotel->name,
+                'revenue' => $data
+            ]
+        ]);
+    }
 
     /*
-|--------------------------------------------------------------------------
-| Revenue Report
-|--------------------------------------------------------------------------
-*/
-
-public function revenueReport(Request $request)
-{
-    $hotel = $this->managerHotel($request);
-
-    $bookings = Booking::where('hotel_id', $hotel->id)
-        ->where('status', 'checked_out')
-        ->select('check_out', 'total_amount')
-        ->get();
-
-    $data = $bookings
-        ->groupBy(fn($booking) => Carbon::parse($booking->check_out)->toDateString())
-        ->map(fn($group, $date) => [
-            'date' => $date,
-            'revenue' => $group->sum('total_amount'),
-        ])
-        ->sortKeys()
-        ->values();
-
-    return response()->json([
-        'result' => true,
-        'data' => [
-            'hotel' => $hotel->name,
-            'revenue' => $data
-        ]
-    ]);
-}
-
-
-    /*
-    |--------------------------------------------------------------------------
-    | Occupancy Report
-    |--------------------------------------------------------------------------
-    */
+     * |--------------------------------------------------------------------------
+     * | Occupancy Report
+     * |--------------------------------------------------------------------------
+     */
 
     public function occupancyReport(Request $request)
     {

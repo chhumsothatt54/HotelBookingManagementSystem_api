@@ -59,7 +59,8 @@ class AdminController extends Controller
      * | Dashboard
      * |--------------------------------------------------------------------------
      */
-public function dashboard()
+
+    public function dashboard()
     {
         $totalUsers = User::count();
 
@@ -99,10 +100,11 @@ public function dashboard()
                 'total_bookings' => $totalBookings,
                 'total_payments' => $totalPayments,
                 'total_revenue' => $totalRevenue,
-                'total_rooms'=>$totalRooms
+                'total_rooms' => $totalRooms
             ],
         ]);
     }
+
     /*
      * |--------------------------------------------------------------------------
      * | Manage Users
@@ -184,14 +186,15 @@ public function dashboard()
      * |--------------------------------------------------------------------------
      */
 
-public function managers(Request $request)
+    public function managers(Request $request)
     {
         $query = User::where('role', 'hotel_manager')->with('hotels');
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('email', 'like', "%{$search}%");
+                $q
+                    ->where('name', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
             });
         }
         if ($request->filled('status')) {
@@ -246,7 +249,8 @@ public function managers(Request $request)
 
     public function hotels()
     {
-        $hotels = Hotel::with('manager')
+        $hotels = Hotel::with(['manager', 'images'])
+            ->withCount('rooms')
             ->latest()
             ->get();
 
@@ -330,7 +334,7 @@ public function managers(Request $request)
 
     public function roomTypes()
     {
-        $roomType = RoomType::with('hotel')->latest()->paginate(10);
+        $roomType = RoomType::with(['hotel', 'images'])->latest()->paginate(10);
 
         return response()->json([
             'message' => 'Room Type retrieved successfully',
@@ -408,7 +412,7 @@ public function managers(Request $request)
 
     public function rooms()
     {
-        $room = Room::with('hotel', 'roomType', 'amenities')
+        $room = Room::with(['hotel', 'roomType.images', 'amenities'])
             ->latest()
             ->paginate(10);
 
@@ -787,6 +791,26 @@ public function managers(Request $request)
         ]);
     }
 
+    public function readNotification($id)
+    {
+        $notification = UserNotification::findOrFail($id);
+        $notification->update(['is_read' => true]);
+
+        return response()->json([
+            'message' => 'Notification marked as read',
+            'data' => $notification,
+        ]);
+    }
+
+    public function readAllNotifications()
+    {
+        UserNotification::where('is_read', false)->update(['is_read' => true]);
+
+        return response()->json([
+            'message' => 'All notifications marked as read',
+        ]);
+    }
+
     /*
      * |--------------------------------------------------------------------------
      * | Audit Logs
@@ -800,4 +824,3 @@ public function managers(Request $request)
         ]);
     }
 }
-
