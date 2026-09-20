@@ -10,8 +10,6 @@ use App\Models\Review;
 use App\Models\Room;
 use App\Models\RoomImage;
 use App\Models\RoomType;
-use App\Models\User;
-use App\Models\UserNotification;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -148,20 +146,10 @@ class HotelManagerController extends Controller
 
         $validated['manager_id'] = $manager->id;
 
+        // ✅ Hotel email = Manager account email
         $validated['email'] = $manager->email;
 
         $hotel = Hotel::create($validated);
-
-        // ✅ Notify the admin about the new hotel (assuming only 1 admin)
-        $admin = User::where('role', 'admin')->first();
-        if ($admin) {
-            UserNotification::create([
-                'user_id' => $admin->id,
-                'title' => 'New Hotel Created',
-                'message' => 'Manager ' . $manager->name . ' has created a new hotel: ' . $hotel->name,
-                'type' => 'hotel_created',
-            ]);
-        }
 
         return response()->json([
             'result' => true,
