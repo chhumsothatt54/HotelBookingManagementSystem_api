@@ -951,7 +951,8 @@ public function deleteAmenity(Request $request, $id)
         $bookings = Booking::where('hotel_id', $hotel->id)
             ->with([
                 'customer',
-                'room.roomType'
+                'room.roomType',
+                'payments'
             ])
             ->latest()
             ->paginate(15);
@@ -986,80 +987,97 @@ public function deleteAmenity(Request $request, $id)
     }
 
 
-    public function updateBookingStatus(Request $request, $id)
+
+public function updateBookingStatus(Request $request, $id)
 {
     $hotel = $this->managerHotel($request);
 
-    $booking = Booking::where('hotel_id', $hotel->id)->findOrFail($id);
+    $booking = Booking::where('hotel_id', $hotel->id)
+        ->with('room')
+        ->findOrFail($id);
 
-    // Validate status
     $validated = $request->validate([
         'status' => [
             'required',
             'string',
             'in:pending,confirmed,checked_in,checked_out,cancelled,rejected'
-        ]
+        ],
     ]);
 
     $newStatus = $validated['status'];
     $currentStatus = $booking->status;
 
-    // Allowed status transitions
+    /*
+    |--------------------------------------------------------------------------
+    | Allowed Status Transitions
+    |--------------------------------------------------------------------------
+    */
+
     $allowedTransitions = [
-        'pending' => ['confirmed', 'rejected', 'cancelled'],
+        'pending' => ['confirmed', 'cancelled', 'rejected'],
         'confirmed' => ['checked_in', 'cancelled'],
         'checked_in' => ['checked_out', 'cancelled'],
         'checked_out' => [],
-        'rejected' => [],
         'cancelled' => [],
+        'rejected' => [],
     ];
 
-    // Check whether the transition is allowed
-    if (
-        isset($allowedTransitions[$currentStatus]) &&
-        !in_array($newStatus, $allowedTransitions[$currentStatus], true)
-    ) {
+    if (!in_array($newStatus, $allowedTransitions[$currentStatus] ?? [], true)) {
         return response()->json([
             'message' => "Cannot change booking status from {$currentStatus} to {$newStatus}."
         ], 422);
     }
 
-    // Update booking status
+    /*
+    |--------------------------------------------------------------------------
+    | Update Booking
+    |--------------------------------------------------------------------------
+    */
+
     $booking->update([
-        'status' => $newStatus
+        'status' => $newStatus,
     ]);
 
-    // Update room status
+    /*
+    |--------------------------------------------------------------------------
+    | Update Room Status
+    |--------------------------------------------------------------------------
+    |
+    | checked_in  → room inactive
+    | checked_out → room maintenance
+    | cancelled/rejected → room available
+    |
+    */
+
     if ($booking->room) {
-        $room = $booking->room;
 
-        // Cancelled or rejected → room becomes available
-        if (in_array($newStatus, ['cancelled', 'rejected'], true)) {
-            $room->update([
-                'status' => 'available'
-            ]);
-        }
-
-        // Checked in → room becomes occupied
         if ($newStatus === 'checked_in') {
-            $room->update([
-                'status' => 'occupied'
+            $booking->room->update([
+                'status' => 'inactive',
             ]);
         }
 
-        // Checked out → room goes to maintenance
         if ($newStatus === 'checked_out') {
-            $room->update([
-                'status' => 'maintenance'
+            $booking->room->update([
+                'status' => 'maintenance',
+            ]);
+        }
+
+        if (in_array($newStatus, ['cancelled', 'rejected'], true)) {
+            $booking->room->update([
+                'status' => 'available',
             ]);
         }
     }
 
     return response()->json([
+        'result' => true,
         'message' => 'Booking status updated successfully.',
-        'data' => $booking->fresh()
+        'data' => $booking->fresh('room'),
     ]);
 }
+
+
 
 
     /*
@@ -1129,7 +1147,7 @@ public function revenueReport(Request $request)
             ->count();
 
         $occupiedRooms = Room::where('hotel_id', $hotel->id)
-            ->where('status', 'occupied')
+            ->where('status', 'inactive')
             ->count();
 
         $availableRooms = Room::where('hotel_id', $hotel->id)
