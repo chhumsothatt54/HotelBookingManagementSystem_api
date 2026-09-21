@@ -155,7 +155,7 @@ class HotelManagerController extends Controller
 
         // ✅ Notify the admin about the new hotel (assuming only 1 admin)
         $admin = User::where('role', 'admin')->first();
-        if ($admin) {
+        if ($admin) { 
             UserNotification::create([
                 'user_id' => $admin->id,
                 'title' => 'New Hotel Created',
