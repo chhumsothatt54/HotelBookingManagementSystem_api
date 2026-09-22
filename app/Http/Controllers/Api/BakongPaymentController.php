@@ -34,7 +34,7 @@ class BakongPaymentController extends Controller
         $booking = Booking::with(['room', 'hotel'])->findOrFail($id);
 
         try {
-            // កំណត់ឈ្មោះសណ្ឋាគារ និងជៀសវាងអក្សរវែងពេក ឬគ្មានតម្លៃ (កំណត់យ៉ាងច្រើនត្រឹម 25 តួអក្សร)
+            // កំណត់ឈ្មោះសណ្ឋាគារ និងជៀសវាងអក្សរវែងពេក ឬគ្មានតម្លៃ (កំណត់យ៉ាងច្រើនត្រឹម 25 តួអក្សរ)
             $rawHotelName = $booking->hotel->name ?? $this->merchantName;
             $safeMerchantName = substr(preg_replace('/[^a-zA-Z0-9\s]/', '', $rawHotelName), 0, 25);
             if (empty($safeMerchantName)) {
@@ -45,18 +45,31 @@ class BakongPaymentController extends Controller
                 bakongAccountID: $this->accountId,
                 merchantName: $safeMerchantName,
                 merchantCity: $this->merchantCity,
-                currency: KHQRData::CURRENCY_USD, 
+                currency: KHQRData::CURRENCY_USD,
                 amount: (float) $booking->total_amount,
                 billNumber: $booking->booking_number,
                 storeLabel: $safeMerchantName,
-                terminalLabel: 'Counter 01'
+                terminalLabel: 'Counter 01',
+                // ចាំបាច់សម្រាប់ Dynamic QR (មាន amount) - timestamp គិតជា milliseconds
+                expirationTimestamp: strval((int) (microtime(true) * 1000) + 10 * 60 * 1000), // ផុតកំណត់ក្នុង 10 នាទី
             );
 
             $result = BakongKHQR::generateIndividual($individualInfo);
 
-            if ($result->status['code'] === 0) {
-                $qrString = $result->data['qr'];
-                $md5      = $result->data['md5'];
+            // ការទប់ទល់ទាំង object និង array ព្រោះ package version ខុសគ្នាអាចត្រឡប់ខុសគ្នា
+            $resultArray = is_array($result) ? $result : (array) $result;
+            $status = $resultArray['status'] ?? [];
+            $statusArray = is_array($status) ? $status : (array) $status;
+            $code = $statusArray['code'] ?? null;
+            $data = $resultArray['data'] ?? [];
+            $dataArray = is_array($data) ? $data : (array) $data;
+
+            Log::info('Bakong Generate QR Response: ' . json_encode($resultArray));
+
+            // responseCode 0 = success (generated locally, no network call)
+            if ($code === 0) {
+                $qrString = $dataArray['qr'];
+                $md5      = $dataArray['md5'];
 
                 $booking->md5_hash = $md5;
                 $booking->save();
@@ -69,10 +82,10 @@ class BakongPaymentController extends Controller
                 ]);
             }
 
-            Log::error('KHQR Generation Error: ' . json_encode($result->status));
+            Log::error('KHQR Generation Error: ' . json_encode($statusArray));
             return response()->json([
                 'success' => false,
-                'message' => $result['status']['message'] ?? 'Failed to generate KHQR',
+                'message' => $statusArray['message'] ?? 'Failed to generate KHQR',
             ], 400);
 
         } catch (\Exception $e) {
@@ -83,6 +96,7 @@ class BakongPaymentController extends Controller
             ], 500);
         }
     }
+
     /**
      * 2. ពិនិត្យស្ថានភាពទូទាត់ពិត — ត្រូវការ Token, ហៅទៅ Bakong Open API ពិត
      */
@@ -102,13 +116,29 @@ class BakongPaymentController extends Controller
             $bakongKHQR = new BakongKHQR($this->token);
             $response = $bakongKHQR->checkTransactionByMD5($booking->md5_hash);
 
+            // ការទប់ទល់ទាំង object និង array ព្រោះ package version ខុសគ្នាអាចត្រឡប់ខុសគ្នា
+            $responseArray = is_array($response) ? $response : (array) $response;
+
+            // checkTransactionByMD5 ត្រឡប់ជា format flat: {"responseCode": 0, ...}
+            // ខុសពី generateIndividual ដែលត្រឡប់ nested: {"status": {"code": 0}, ...}
+            // ដូច្នេះត្រូវពិនិត្យទាំងពីររូបភាព ដើម្បីធានាដំណើរការទោះបីជា package ផ្លាស់ប្តូរ format
+            if (array_key_exists('responseCode', $responseArray)) {
+                $code = $responseArray['responseCode'];
+            } else {
+                $status = $responseArray['status'] ?? [];
+                $statusArray = is_array($status) ? $status : (array) $status;
+                $code = $statusArray['code'] ?? null;
+            }
+
+            Log::info('Bakong Check Status Response: ' . json_encode($responseArray));
+
             // responseCode 0 = ទូទាត់ជោគជ័យ
-            if ($response->status['code'] === 0) {
+            if ($code === 0) {
                 $booking->payment_status = 'paid';
                 $booking->status = 'confirmed';
                 $booking->save();
 
-                return response()->json(['status' => 'paid', 'data' => $response->data]);
+                return response()->json(['status' => 'paid', 'data' => $responseArray['data'] ?? null]);
             }
 
             return response()->json(['status' => 'pending']);
