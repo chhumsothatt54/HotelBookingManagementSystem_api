@@ -368,7 +368,7 @@ class CustomerController extends Controller
     public function bookingHistory(Request $request)
     {
         $bookings = Booking::where('customer_id', $request->user()->id)
-            ->with(['hotel', 'room.roomType', 'payments'])
+            ->with(['hotel.images', 'room.roomType', 'payments'])
             ->latest()
             ->paginate(10);
 
@@ -381,7 +381,7 @@ class CustomerController extends Controller
     public function bookingDetail(Request $request, $id)
     {
         $booking = Booking::where('customer_id', $request->user()->id)
-            ->with(['hotel', 'room.roomType', 'payments'])
+            ->with(['hotel.images', 'room.roomType', 'payments'])
             ->findOrFail($id);
 
         return response()->json(['data' => $booking]);
@@ -482,10 +482,10 @@ class CustomerController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'name' => 'sometimes|string|max:255',
-            'phone' => 'sometimes|string|max:20',
+            'name' => 'required|string|max:200',
+            'phone' => 'sometimes|nullable|string|max:20',
             'email' => [
-                'sometimes',
+                'required',
                 'email',
                 'max:255',
                 Rule::unique('users', 'email')->ignore($user->id),

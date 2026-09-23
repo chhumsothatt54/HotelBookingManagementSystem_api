@@ -138,6 +138,16 @@ class BakongPaymentController extends Controller
                 $booking->status = 'confirmed';
                 $booking->save();
 
+                // Create a record in the payments table for Bakong KHQR
+                \App\Models\Payment::create([
+                    'booking_id' => $booking->id,
+                    'amount' => $booking->total_amount,
+                    'payment_method' => 'bakong',
+                    'transaction_id' => $booking->md5_hash, // Use MD5 hash as transaction ID
+                    'status' => 'completed',
+                    'paid_at' => now(),
+                ]);
+
                 return response()->json(['status' => 'paid', 'data' => $responseArray['data'] ?? null]);
             }
 
@@ -158,6 +168,15 @@ class BakongPaymentController extends Controller
         $booking->payment_status = 'paid';
         $booking->status = 'confirmed';
         $booking->save();
+
+        \App\Models\Payment::create([
+            'booking_id' => $booking->id,
+            'amount' => $booking->total_amount,
+            'payment_method' => 'bakong',
+            'transaction_id' => 'MOCK-' . time(),
+            'status' => 'completed',
+            'paid_at' => now(),
+        ]);
 
         return response()->json(['success' => true]);
     }

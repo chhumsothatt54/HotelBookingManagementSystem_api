@@ -650,7 +650,7 @@ class AdminController extends Controller
             'booking.hotel',
         ])
             ->latest()
-            ->paginate(10);
+            ->paginate(100);
 
         return response()->json([
             'message' => 'Payments retrieved successfully',

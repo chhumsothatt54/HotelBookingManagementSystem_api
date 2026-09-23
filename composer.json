@@ -8,7 +8,6 @@
     "require": {
         "php": "^8.2",
         "fidele007/bakong-khqr-php": "^1.2",
-        "khqr-gateway/bakong-khqr-php": "^1.0",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.31",
