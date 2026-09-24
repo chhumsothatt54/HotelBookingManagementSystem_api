@@ -9,6 +9,7 @@ use App\Models\RefundRequest;
 use App\Models\Review;
 use App\Models\Room;
 use App\Models\UserNotification;
+use App\Models\Wishlist;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -554,5 +555,57 @@ class CustomerController extends Controller
             'message' => 'All notifications marked as read.',
             'updated_count' => $updatedCount
         ], 200);
+    }
+
+    /**
+     * Wishlist Operations
+     */
+    public function getWishlist(Request $request)
+    {
+        $wishlists = Wishlist::where('user_id', $request->user()->id)
+            ->with(['hotel.images', 'hotel.roomTypes'])
+            ->latest()
+            ->paginate(10);
+
+        return response()->json($wishlists);
+    }
+
+    public function addToWishlist(Request $request)
+    {
+        $request->validate([
+            'hotel_id' => 'required|exists:hotels,id',
+        ]);
+
+        $exists = Wishlist::where('user_id', $request->user()->id)
+            ->where('hotel_id', $request->hotel_id)
+            ->exists();
+
+        if ($exists) {
+            return response()->json(['message' => 'Hotel already in wishlist'], 200);
+        }
+
+        $wishlist = Wishlist::create([
+            'user_id' => $request->user()->id,
+            'hotel_id' => $request->hotel_id,
+        ]);
+
+        return response()->json([
+            'message' => 'Hotel added to wishlist successfully.',
+            'data' => $wishlist
+        ], 201);
+    }
+
+    public function removeFromWishlist(Request $request, $hotelId)
+    {
+        $wishlist = Wishlist::where('user_id', $request->user()->id)
+            ->where('hotel_id', $hotelId)
+            ->first();
+
+        if ($wishlist) {
+            $wishlist->delete();
+            return response()->json(['message' => 'Hotel removed from wishlist']);
+        }
+
+        return response()->json(['message' => 'Wishlist item not found'], 404);
     }
 }

@@ -370,6 +370,11 @@ Route::prefix('v1')->group(function () {
 
             // Hotel Review 
             Route::post('/hotels/{hotelId}/reviews', [CustomerController::class, 'createReview']);
+            
+            // Wishlist
+            Route::get('/wishlist', [CustomerController::class, 'getWishlist']);
+            Route::post('/wishlist', [CustomerController::class, 'addToWishlist']);
+            Route::delete('/wishlist/{hotelId}', [CustomerController::class, 'removeFromWishlist']);
         });
 
         // Notifications 

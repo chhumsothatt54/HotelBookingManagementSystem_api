@@ -1017,9 +1017,31 @@ class HotelManagerController extends Controller
          * |--------------------------------------------------------------------------
          */
 
-        $booking->update([
-            'status' => $newStatus,
-        ]);
+        $booking->status = $newStatus;
+
+        if (in_array($newStatus, ['confirmed', 'checked_in'], true)) {
+            $booking->payment_status = 'paid';
+        }
+
+        $booking->save();
+
+        if ($newStatus === 'confirmed') {
+            \App\Models\UserNotification::create([
+                'user_id' => $booking->customer_id,
+                'title' => 'Booking Confirmed',
+                'message' => 'Your booking at ' . $hotel->name . ' has been confirmed.',
+                'type' => 'booking_confirmed',
+                'is_read' => false,
+            ]);
+        } elseif ($newStatus === 'checked_in') {
+            \App\Models\UserNotification::create([
+                'user_id' => $booking->customer_id,
+                'title' => 'Checked In',
+                'message' => 'You have successfully checked in at ' . $hotel->name . '.',
+                'type' => 'checked_in',
+                'is_read' => false,
+            ]);
+        }
 
         /*
          * |--------------------------------------------------------------------------
