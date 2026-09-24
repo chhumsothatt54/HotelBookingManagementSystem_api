@@ -164,6 +164,23 @@ class HotelManagerController extends Controller
             ]);
         }
 
+        // ✅ Notify Telegram Group
+        try {
+            $telegramMsg = "🏨 *New Hotel Created!*\n"
+                         . "👤 *Manager:* {$manager->name}\n"
+                         . "📧 *Email:* {$manager->email}\n"
+                         . "🏢 *Hotel Name:* {$hotel->name}\n"
+                         . "📍 *Location:* {$hotel->city}, {$hotel->country}";
+
+            \Telegram\Bot\Laravel\Facades\Telegram::sendMessage([
+                'chat_id' => env('TELEGRAM_GROUP_ID', '-5348551454'),
+                'text' => $telegramMsg,
+                'parse_mode' => 'Markdown'
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Telegram notification failed: ' . $e->getMessage());
+        }
+
         return response()->json([
             'result' => true,
             'message' => 'Hotel created successfully.',
