@@ -15,6 +15,7 @@ use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Str;
 use Laravel\Socialite\Facades\Socialite;
 use Exception;
+use Telegram\Bot\Laravel\Facades\Telegram;
 
 class AuthController extends Controller
 {
@@ -47,6 +48,23 @@ class AuthController extends Controller
 
         // Send Email
         Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
+
+        // Send Telegram Notification to Admin/Group
+        try {
+            $message = "🆕 <b>New Customer Registration</b>\n";
+            $message .= "👤 Name: " . $user->name . "\n";
+            $message .= "📧 Email: " . $user->email . "\n";
+            $message .= "📱 Phone: " . ($user->phone ?? 'N/A') . "\n";
+            $message .= "🕒 Time: " . Carbon::now()->format('Y-m-d H:i:s');
+
+            Telegram::sendMessage([
+                'chat_id' => env('TELEGRAM_GROUP_ID'),
+                'text' => $message,
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Telegram Send Error: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Register successful. Please verify your email.',
@@ -83,6 +101,23 @@ class AuthController extends Controller
 
         // Send Email
         Mail::to($user->email)->send(new VerifyEmailMail($user->email, $token));
+
+        // Send Telegram Notification to Admin/Group
+        try {
+            $message = "🆕 <b>New Manager Registration</b>\n";
+            $message .= "👤 Name: " . $user->name . "\n";
+            $message .= "📧 Email: " . $user->email . "\n";
+            $message .= "📱 Phone: " . ($user->phone ?? 'N/A') . "\n";
+            $message .= "🕒 Time: " . Carbon::now()->format('Y-m-d H:i:s');
+
+            Telegram::sendMessage([
+                'chat_id' => env('TELEGRAM_GROUP_ID'),
+                'text' => $message,
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Telegram Send Error: ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Hotel Manager register successful. Please verify your email.',
@@ -175,6 +210,25 @@ class AuthController extends Controller
                 'verified_at' => now(),
             ]);
         });
+
+        // Send Telegram Notification
+        try {
+            if ($verification->user) {
+                $user = $verification->user;
+                $message = "✅ <b>User Email Verified</b>\n";
+                $message .= "👤 Name: " . $user->name . "\n";
+                $message .= "📧 Email: " . $user->email . "\n";
+                $message .= "🕒 Time: " . Carbon::now()->format('Y-m-d H:i:s');
+
+                Telegram::sendMessage([
+                    'chat_id' => env('TELEGRAM_GROUP_ID'),
+                    'text' => $message,
+                    'parse_mode' => 'HTML',
+                ]);
+            }
+        } catch (Exception $e) {
+            \Log::error('Telegram Send Error (Verify): ' . $e->getMessage());
+        }
         if ($request->wantsJson()) {
             return response()->json(['message' => 'Email verified successfully']);
         }
@@ -210,6 +264,23 @@ class AuthController extends Controller
         }
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        // Send Telegram Notification for Login
+        try {
+            $message = "🔑 <b>User Login</b>\n";
+            $message .= "👤 Name: " . $user->name . "\n";
+            $message .= "📧 Email: " . $user->email . "\n";
+            $message .= "🛂 Role: " . ucfirst($user->role) . "\n";
+            $message .= "🕒 Time: " . Carbon::now()->format('Y-m-d H:i:s');
+
+            Telegram::sendMessage([
+                'chat_id' => env('TELEGRAM_GROUP_ID'),
+                'text' => $message,
+                'parse_mode' => 'HTML',
+            ]);
+        } catch (Exception $e) {
+            \Log::error('Telegram Send Error (Login): ' . $e->getMessage());
+        }
 
         return response()->json([
             'message' => 'Login successful',
@@ -260,6 +331,24 @@ class AuthController extends Controller
             }
 
             $token = $user->createToken('auth-token')->plainTextToken;
+
+            // Send Telegram Notification for Google Login
+            try {
+                $message = "🔑 <b>User Login</b>\n";
+                $message .= "👤 Name: " . $user->name . "\n";
+                $message .= "📧 Email: " . $user->email . "\n";
+                $message .= "🛂 Role: " . ucfirst($user->role) . "\n";
+                $message .= "🔧 Method: Google OAuth\n";
+                $message .= "🕒 Time: " . Carbon::now()->format('Y-m-d H:i:s');
+
+                Telegram::sendMessage([
+                    'chat_id' => env('TELEGRAM_GROUP_ID'),
+                    'text' => $message,
+                    'parse_mode' => 'HTML',
+                ]);
+            } catch (Exception $e) {
+                \Log::error('Telegram Send Error (Google Login): ' . $e->getMessage());
+            }
 
             return redirect()->to('http://localhost:5173/login?token=' . $token);
             
