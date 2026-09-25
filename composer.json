@@ -8,11 +8,11 @@
     "require": {
         "php": "^8.2",
         "fidele007/bakong-khqr-php": "^1.2",
+        "irazasyed/telegram-bot-sdk": "^3.16",
         "laravel/framework": "^12.0",
         "laravel/sanctum": "^4.0",
         "laravel/socialite": "^5.31",
-        "laravel/tinker": "^2.10.1",
-        "irazasyed/telegram-bot-sdk": "^3.0"
+        "laravel/tinker": "^2.10.1"
     },
     "require-dev": {
         "fakerphp/faker": "^1.23",
